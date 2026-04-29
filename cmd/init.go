@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/niktin06sash/VoidLink/internal/config"
 	"github.com/spf13/cobra"
@@ -16,7 +17,10 @@ var initCmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		userRole := args[0]
-		path, cfg, priv, err := config.InitConfig(userRole)
+		if secretPhrase == "" {
+			secretPhrase = "vlink-" + generateRandomString(12)
+		}
+		path, cfg, priv, err := config.InitConfig(userRole, secretPhrase)
 		if err != nil {
 			return err
 		}
@@ -29,4 +33,13 @@ var initCmd = &cobra.Command{
 		fmt.Printf("Local IP set to: %s\n", cfg.LocalIP)
 		return nil
 	},
+}
+
+func generateRandomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	ret := make([]byte, n)
+	for i := range ret {
+		ret[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(ret)
 }

@@ -22,7 +22,11 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
+var secretPhrase string
+
 func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(upCmd)
+	initCmd.Flags().StringVarP(&secretPhrase, "secret", "s", "", "secret phrase for rendezvous (leave empty for random)")
 }

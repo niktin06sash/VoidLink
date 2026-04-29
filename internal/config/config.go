@@ -17,21 +17,26 @@ const (
 	Client Role = "client"
 )
 
+type PeerInfo struct {
+	Name    string `yaml:"name"`
+	AddedAt string `yaml:"added_at"`
+}
 type Config struct {
-	Role          Role     `yaml:"role"`
-	LocalIP       string   `yaml:"local_ip"`
-	InterfaceName string   `yaml:"interface_name"`
-	Whitelist     []string `yaml:"whitelist"`
-	KeyPath       string   `yaml:"key_path"`
+	Role          Role                `yaml:"role"`
+	LocalIP       string              `yaml:"local_ip"`
+	InterfaceName string              `yaml:"interface_name"`
+	Whitelist     map[string]PeerInfo `yaml:"whitelist"`
+	KeyPath       string              `yaml:"key_path"`
+	Rendezvous    string              `yaml:"rendezvous"`
 }
 
-func InitConfig(role string) (string, *Config, crypto.PrivKey, error) {
+func InitConfig(role string, secret string) (string, *Config, crypto.PrivKey, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to find home directory: %w", err)
 	}
 	configDir := filepath.Join(home, ".voidlink")
-	keyPath := filepath.Join(configDir, "node.key")
+	keyPath := filepath.Join(configDir, role+".key")
 	configPath := filepath.Join(configDir, role+".yaml")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return "", nil, nil, fmt.Errorf("failed to create config dir: %w", err)
@@ -63,8 +68,9 @@ func InitConfig(role string) (string, *Config, crypto.PrivKey, error) {
 			Role:          Role(role),
 			LocalIP:       localIP,
 			InterfaceName: ifaceName,
-			Whitelist:     []string{},
+			Whitelist:     map[string]PeerInfo{},
 			KeyPath:       keyPath,
+			Rendezvous:    secret,
 		}
 		if err := saveConfig(configPath, *cfg); err != nil {
 			return "", nil, nil, err

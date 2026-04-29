@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/niktin06sash/VoidLink/internal/config"
+	"github.com/niktin06sash/VoidLink/internal/node"
+	"github.com/niktin06sash/VoidLink/internal/tun"
 	"github.com/spf13/cobra"
 )
 
@@ -24,12 +24,21 @@ var upCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		myID, err := config.GetPeerID(priv)
+		tunnel, err := tun.NewTun(cfg)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Starting VoidLink as %s\n", cfg.Role)
-		fmt.Printf("Node ID: %s\n", myID)
+		defer tunnel.Close()
+		ctx := cmd.Context()
+		noda, err := node.NewNode(ctx, cfg, tunnel, priv)
+		if err != nil {
+			return err
+		}
+		defer noda.Close()
+		err = noda.Run()
+		if err != nil {
+			return err
+		}
 		return nil
 	},
 }
