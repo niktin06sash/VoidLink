@@ -7,5 +7,5 @@ import (
 
 func (n *Node) startServer() {
 	routingDiscovery := routing.NewRoutingDiscovery(n.DHT)
-	util.Advertise(n.ctx, routingDiscovery, n.Cfg.Rendezvous)
+	util.Advertise(n.ctx, routingDiscovery, n.rendezvous)
 }

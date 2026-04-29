@@ -16,21 +16,26 @@ import (
 	"github.com/niktin06sash/VoidLink/internal/config"
 	"github.com/niktin06sash/VoidLink/internal/node/gater"
 	implmDNS "github.com/niktin06sash/VoidLink/internal/node/mdns"
+	"github.com/niktin06sash/VoidLink/internal/node/whitelist"
 	"github.com/niktin06sash/VoidLink/internal/tun"
 )
 
 type Node struct {
-	Host host.Host
-	DHT  *dht.IpfsDHT
-	Tun  *tun.Tun
-	Cfg  *config.Config
-	Mdns mdns.Service
-	ctx  context.Context
+	Host       host.Host
+	DHT        *dht.IpfsDHT
+	Tun        *tun.Tun
+	wm         *whitelist.WhitelistManager
+	rendezvous string
+	role       config.Role
+	mdns       mdns.Service
+	ctx        context.Context
+	path       string
 }
 
-func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey crypto.PrivKey) (*Node, error) {
+func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey crypto.PrivKey, path string) (*Node, error) {
+	wgh := whitelist.NewWhitelistManager(cfg.Whitelist)
 	host, err := libp2p.New(
-		libp2p.ConnectionGater(gater.NewSecurityGater(cfg.Whitelist)),
+		libp2p.ConnectionGater(gater.NewSecurityGater(wgh)),
 		libp2p.Identity(privkey),
 		libp2p.ListenAddrStrings(
 			"/ip4/0.0.0.0/tcp/0",
@@ -42,7 +47,7 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 	if err != nil {
 		return nil, fmt.Errorf("error while create node: %w", err)
 	}
-	locmdns := implmDNS.NewDiscoveryNotifee(ctx, host, cfg.Whitelist)
+	locmdns := implmDNS.NewDiscoveryNotifee(ctx, host, wgh)
 	ser := mdns.NewMdnsService(host, implmDNS.MDNSName, locmdns)
 	err = ser.Start()
 	if err != nil {
@@ -52,11 +57,11 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DHT: %w", err)
 	}
-	return &Node{Host: host, DHT: kdht, Tun: tun, Cfg: cfg}, nil
+	return &Node{Host: host, DHT: kdht, Tun: tun, rendezvous: cfg.Rendezvous, wm: wgh, role: cfg.Role, path: path}, nil
 }
 
 func (n *Node) Close() error {
-	n.Mdns.Close()
+	n.mdns.Close()
 	n.DHT.Close()
 	return n.Host.Close()
 }

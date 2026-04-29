@@ -9,18 +9,22 @@ import (
 
 var upCmd = &cobra.Command{
 	Use:           "up [role]",
-	Short:         "Start VoidLink tunnel using a specific profile",
+	Short:         "Start VoidLink tunnel using a specific role",
 	Args:          cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	ValidArgs:     []string{"server", "client"},
 	SilenceErrors: false,
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		roleName := args[0]
-		cfg, err := config.LoadConfig(roleName)
+		finalPath := cfgFile
+		if finalPath == "" {
+			finalPath = config.GetConfigPath(roleName)
+		}
+		cfg, err := config.LoadConfig(finalPath)
 		if err != nil {
 			return err
 		}
-		priv, err := config.LoadIdentity(cfg.KeyPath)
+		priv, err := config.LoadIdentity(cfg.KeyPath, finalPath)
 		if err != nil {
 			return err
 		}
@@ -29,12 +33,12 @@ var upCmd = &cobra.Command{
 			return err
 		}
 		defer tunnel.Close()
-		ctx := cmd.Context()
-		noda, err := node.NewNode(ctx, cfg, tunnel, priv)
+		noda, err := node.NewNode(cmd.Context(), cfg, tunnel, priv, finalPath)
 		if err != nil {
 			return err
 		}
 		defer noda.Close()
+		noda.WatchSignal()
 		err = noda.Run()
 		if err != nil {
 			return err

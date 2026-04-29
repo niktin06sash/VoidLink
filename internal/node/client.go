@@ -17,7 +17,7 @@ func (n *Node) startClient() {
 			return
 		case <-ticker.C:
 			routingDiscovery := routing.NewRoutingDiscovery(n.DHT)
-			peerChan, err := routingDiscovery.FindPeers(n.ctx, n.Cfg.Rendezvous)
+			peerChan, err := routingDiscovery.FindPeers(n.ctx, n.rendezvous)
 			if err != nil {
 				continue
 			}
@@ -25,8 +25,7 @@ func (n *Node) startClient() {
 				if p.ID == n.Host.ID() || len(p.Addrs) == 0 {
 					continue
 				}
-				_, ok := n.Cfg.Whitelist[p.ID.String()]
-				if !ok {
+				if !n.wm.IsAllowed(p.ID) {
 					continue
 				}
 				s, err := n.Host.NewStream(n.ctx, p.ID, protocol.ID(ProtocolID))

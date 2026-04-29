@@ -16,7 +16,7 @@ func (n *Node) Run() error {
 	n.Host.SetStreamHandler(protocol.ID(ProtocolID), func(s network.Stream) {
 		go n.startTunnel(s)
 	})
-	if n.Cfg.Role == config.Server {
+	if n.role == config.Server {
 		n.startServer()
 		<-n.ctx.Done()
 	} else {

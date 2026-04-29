@@ -30,73 +30,71 @@ type Config struct {
 	Rendezvous    string              `yaml:"rendezvous"`
 }
 
-func InitConfig(role string, secret string) (string, *Config, crypto.PrivKey, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to find home directory: %w", err)
-	}
-	configDir := filepath.Join(home, ".voidlink")
+const serverLocalIP = "10.1.1.1"
+const clientLocalIP = "10.1.1.2"
+const clientInterface = "void1"
+const serverInterface = "void0"
+
+func InitConfig(role string, secret string, path string) (*Config, crypto.PrivKey, error) {
+	configDir := filepath.Dir(path)
 	keyPath := filepath.Join(configDir, role+".key")
-	configPath := filepath.Join(configDir, role+".yaml")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to create config dir: %w", err)
-	}
-	var priv crypto.PrivKey
-	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
-		priv, err = createIdentity(keyPath)
-		if err != nil {
-			return "", nil, nil, err
-		}
-	} else {
-		priv, err = LoadIdentity(keyPath)
-		if err != nil {
-			return "", nil, nil, err
-		}
+		return nil, nil, fmt.Errorf("failed to create config dir: %w", err)
 	}
 	var cfg *Config
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		localIP := "10.1.1.2"
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		localIP := clientLocalIP
 		if Role(role) == Server {
-			localIP = "10.1.1.1"
+			localIP = serverLocalIP
 		}
-
-		ifaceName := "void1"
+		ifaceName := clientInterface
 		if Role(role) == Server {
-			ifaceName = "void0"
+			ifaceName = serverInterface
 		}
 		cfg = &Config{
 			Role:          Role(role),
 			LocalIP:       localIP,
 			InterfaceName: ifaceName,
 			Whitelist:     map[string]PeerInfo{},
-			KeyPath:       keyPath,
+			KeyPath:       role + ".key",
 			Rendezvous:    secret,
 		}
-		if err := saveConfig(configPath, *cfg); err != nil {
-			return "", nil, nil, err
+		if err := SaveConfig(path, *cfg); err != nil {
+			return nil, nil, err
 		}
 	} else {
-		cfg, err = LoadConfig(role)
+		cfg, err = LoadConfig(path)
 		if err != nil {
-			return "", nil, nil, err
+			return nil, nil, err
 		}
 	}
-	return configPath, cfg, priv, nil
+	var priv crypto.PrivKey
+	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+		priv, err = createIdentity(keyPath)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		priv, err = LoadIdentity(cfg.KeyPath, path)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return cfg, priv, nil
 }
 
-func LoadConfig(profileName string) (*Config, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home dir: %w", err)
-	}
-	path := filepath.Join(home, ".voidlink", profileName+".yaml")
+func GetConfigPath(role string) string {
+	return filepath.Join(getHomeDir(), ".voidlink", role+".yaml")
+}
+
+func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not read config file: %w", err)
+		return nil, err
 	}
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("could not parse yaml: %w", err)
+		return nil, err
 	}
 	return &cfg, nil
 }
@@ -104,12 +102,14 @@ func LoadConfig(profileName string) (*Config, error) {
 func GetPeerID(priv crypto.PrivKey) (string, error) {
 	id, err := peer.IDFromPrivateKey(priv)
 	if err != nil {
-		return "", fmt.Errorf("failet to get id from private key: %w", err)
+		return "", fmt.Errorf("failet to get peer id from private key: %w", err)
 	}
 	return id.String(), nil
 }
-func LoadIdentity(targetPath string) (crypto.PrivKey, error) {
-	data, err := os.ReadFile(targetPath)
+func LoadIdentity(keypath, targetPath string) (crypto.PrivKey, error) {
+	configDir := filepath.Dir(targetPath)
+	actualKeyPath := filepath.Join(configDir, keypath)
+	data, err := os.ReadFile(actualKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key: %w", err)
 	}
@@ -119,8 +119,7 @@ func LoadIdentity(targetPath string) (crypto.PrivKey, error) {
 	}
 	return key, nil
 }
-
-func saveConfig(configPath string, cfg Config) error {
+func SaveConfig(configPath string, cfg Config) error {
 	yamlData, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
@@ -131,7 +130,15 @@ func saveConfig(configPath string, cfg Config) error {
 	}
 	return nil
 }
-
+func getHomeDir() string {
+	if os.Geteuid() == 0 {
+		if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
+			return "/home/" + sudoUser
+		}
+	}
+	home, _ := os.UserHomeDir()
+	return home
+}
 func createIdentity(targetPath string) (crypto.PrivKey, error) {
 	priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
 	if err != nil {
