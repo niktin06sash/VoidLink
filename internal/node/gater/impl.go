@@ -1,6 +1,8 @@
 package gater
 
 import (
+	"log"
+
 	"github.com/libp2p/go-libp2p/core/control"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -30,7 +32,11 @@ func (g *SecurityGater) InterceptAccept(c network.ConnMultiaddrs) bool {
 
 func (g *SecurityGater) InterceptSecured(dir network.Direction, p peer.ID, c network.ConnMultiaddrs) bool {
 	if dir == network.DirInbound {
-		return g.wm.IsAllowed(p)
+		allowed := g.wm.IsAllowed(p)
+		if !allowed {
+			log.Printf("gater: inbound secured rejected peer=%s", p)
+		}
+		return allowed
 	}
 	return true
 }

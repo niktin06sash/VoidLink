@@ -1,6 +1,8 @@
 package node
 
 import (
+	"log"
+
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/discovery/util"
 )
@@ -8,4 +10,5 @@ import (
 func (n *Node) startServer() {
 	routingDiscovery := routing.NewRoutingDiscovery(n.DHT)
 	util.Advertise(n.ctx, routingDiscovery, n.rendezvous)
+	log.Printf("server: advertised rendezvous=%s ", n.rendezvous)
 }

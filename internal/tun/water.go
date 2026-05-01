@@ -2,8 +2,10 @@ package tun
 
 import (
 	"fmt"
+	"log"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/niktin06sash/VoidLink/internal/config"
 	"github.com/songgao/water"
@@ -20,6 +22,7 @@ func NewTun(cfg *config.Config) (*Tun, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error while created TUN-interface: %w", err)
 	}
+	log.Printf("tun: created interface name=%s", cfg.InterfaceName)
 	t := &Tun{
 		Iface: iface,
 	}
@@ -41,15 +44,15 @@ func (t *Tun) applySettings(cfg *config.Config) error {
 
 	for _, args := range commands {
 		cmd := exec.Command(args[0], args[1:]...)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("command failed %v: %w", args, err)
+		log.Printf("tun: exec %s", strings.Join(args, " "))
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("command failed %v: %w (output=%s)", args, err, strings.TrimSpace(string(out)))
 		}
 	}
+	log.Printf("tun: configured ip=%s dev=%s mtu=%d", cfg.LocalIP, cfg.InterfaceName, 1400)
 	return nil
 }
 func (t *Tun) Close() error {
-	if t.Iface != nil {
-		return t.Iface.Close()
-	}
-	return nil
+	return t.Iface.Close()
 }

@@ -1,6 +1,7 @@
 package node
 
 import (
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,11 +18,14 @@ func (n *Node) WatchSignal() {
 			case <-n.ctx.Done():
 				return
 			case <-sigs:
+				log.Printf("config: received SIGHUP, reloading whitelist path=%s", n.path)
 				newCfg, err := config.LoadConfig(n.path)
 				if err != nil {
+					log.Printf("config: reload failed err=%v", err)
 					continue
 				}
 				n.wm.Update(newCfg.Whitelist)
+				log.Printf("config: whitelist reloaded entries=%d", len(newCfg.Whitelist))
 			}
 		}
 	}()

@@ -2,18 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"slices"
 
 	"github.com/niktin06sash/VoidLink/internal/config"
-	"github.com/niktin06sash/VoidLink/internal/node"
-	"github.com/niktin06sash/VoidLink/internal/tun"
 	"github.com/spf13/cobra"
 )
 
-var upCmd = &cobra.Command{
-	Use:   "up [role]",
-	Short: "Start VoidLink tunnel using a specific role",
+var statusCmd = &cobra.Command{
+	Use:   "status [role]",
+	Short: "Show the status of the VoidLink tunnel",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if err := cobra.ExactArgs(1)(cmd, args); err != nil {
 			return err
@@ -24,15 +21,12 @@ var upCmd = &cobra.Command{
 		}
 		return fmt.Errorf("invalid role: %s", args[0])
 	},
-	SilenceErrors: false,
-	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		role := args[0]
 		finalPath := cfgFile
 		if finalPath == "" {
 			finalPath = config.GetConfigPath(role)
 		}
-		log.Printf("up: role=%s config=%s", role, finalPath)
 		cfg, err := config.LoadConfig(finalPath)
 		if err != nil {
 			return err
@@ -45,22 +39,15 @@ var upCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		log.Printf("up: peer_id=%s iface=%s ip=%s rendezvous=%s whitelist=%d", peerID, cfg.InterfaceName, cfg.LocalIP, cfg.Rendezvous, len(cfg.Whitelist))
-		tunnel, err := tun.NewTun(cfg)
-		if err != nil {
-			return err
-		}
-		defer tunnel.Close()
-		noda, err := node.NewNode(cmd.Context(), cfg, tunnel, priv, finalPath)
-		if err != nil {
-			return err
-		}
-		defer noda.Close()
-		noda.WatchSignal()
-		err = noda.Run()
-		if err != nil {
-			return err
-		}
+
+		fmt.Printf("Config: %s\n", finalPath)
+		fmt.Printf("Role: %s\n", cfg.Role)
+		fmt.Printf("Peer ID: %s\n", peerID)
+		fmt.Printf("Local IP: %s\n", cfg.LocalIP)
+		fmt.Printf("Interface Name: %s\n", cfg.InterfaceName)
+		fmt.Printf("Key Path: %s\n", cfg.KeyPath)
+		fmt.Printf("Rendezvous: %s\n", cfg.Rendezvous)
+		fmt.Printf("Whitelist entries: %d\n", len(cfg.Whitelist))
 		return nil
 	},
 }

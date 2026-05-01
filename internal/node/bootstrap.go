@@ -1,25 +1,40 @@
 package node
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 func (n *Node) bootstrap() error {
+	log.Printf("bootstrap: starting dht bootstrap...")
 	if err := n.DHT.Bootstrap(n.ctx); err != nil {
 		return fmt.Errorf("error while create bootstrap: %w", err)
 	}
+	log.Printf("bootstrap: dht bootstrap complete, connecting to default bootstrap peers=%d", len(dht.DefaultBootstrapPeers))
+	var ok int
 	for _, addr := range dht.DefaultBootstrapPeers {
 		pi, err := peer.AddrInfoFromP2pAddr(addr)
 		if err != nil {
-			return fmt.Errorf("error while get info from p2p address: %w", err)
+			log.Printf("bootstrap: parse bootstrap peer failed addr=%s err=%v", addr, err)
+			continue
 		}
-		err = n.Host.Connect(n.ctx, *pi)
+		ctx, cancel := context.WithTimeout(n.ctx, 30*time.Second)
+		err = n.Host.Connect(ctx, *pi)
+		cancel()
 		if err != nil {
-			return fmt.Errorf("error while connect to host: %w", err)
+			log.Printf("bootstrap: connect failed peer=%s err=%v", pi.ID, err)
+			continue
 		}
+		ok++
 	}
+	if ok == 0 {
+		return fmt.Errorf("bootstrap: no default bootstrap peers reachable")
+	}
+	log.Printf("bootstrap: connected bootstrap_peers=%d/%d", ok, len(dht.DefaultBootstrapPeers))
 	return nil
 }

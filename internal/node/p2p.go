@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 
@@ -47,17 +48,33 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 	if err != nil {
 		return nil, fmt.Errorf("error while create node: %w", err)
 	}
+	log.Printf("node: created host peer_id=%s", host.ID())
+	for _, a := range host.Addrs() {
+		log.Printf("node: listen_addr=%s", a)
+	}
 	locmdns := implmDNS.NewDiscoveryNotifee(ctx, host, wgh)
 	ser := mdns.NewMdnsService(host, implmDNS.MDNSName, locmdns)
 	err = ser.Start()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start mDNS: %w", err)
 	}
+	log.Printf("node: mdns started service=%s", implmDNS.MDNSName)
 	kdht, err := dht.New(ctx, host, dht.Mode(dht.ModeAuto))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DHT: %w", err)
 	}
-	return &Node{Host: host, DHT: kdht, Tun: tun, rendezvous: cfg.Rendezvous, wm: wgh, role: cfg.Role, path: path}, nil
+	log.Printf("node: dht created mode=auto")
+	return &Node{
+		Host:       host,
+		DHT:        kdht,
+		Tun:        tun,
+		rendezvous: cfg.Rendezvous,
+		wm:         wgh,
+		role:       cfg.Role,
+		mdns:       ser,
+		ctx:        ctx,
+		path:       path,
+	}, nil
 }
 
 func (n *Node) Close() error {

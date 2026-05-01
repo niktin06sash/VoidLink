@@ -2,7 +2,7 @@ package mdns
 
 import (
 	"context"
-	"fmt"
+	"log"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -26,10 +26,14 @@ func (n *DiscoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
 		return
 	}
 	if !n.wm.IsAllowed(pi.ID) {
+		log.Printf("mdns: peer found but not whitelisted peer=%s", pi.ID)
 		return
 	}
+	log.Printf("mdns: attempting connect peer=%s addrs=%d", pi.ID, len(pi.Addrs))
 	err := n.h.Connect(n.ctx, pi)
 	if err != nil {
-		fmt.Printf("error while connect to mDNS %s: %v\n", pi.ID, err)
+		log.Printf("mdns: connect failed peer=%s err=%v", pi.ID, err)
+		return
 	}
+	log.Printf("mdns: connected peer=%s", pi.ID)
 }
