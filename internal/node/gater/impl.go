@@ -19,11 +19,11 @@ type SecurityGater struct {
 }
 
 func (g *SecurityGater) InterceptPeerDial(p peer.ID) bool {
-	return g.wm.IsAllowed(p)
+	return g.wm.IsAllowed(p) || isBootstrapPeer(p)
 }
 
 func (g *SecurityGater) InterceptAddrDial(p peer.ID, a ma.Multiaddr) bool {
-	return g.wm.IsAllowed(p)
+	return g.wm.IsAllowed(p) || isBootstrapPeer(p)
 }
 
 func (g *SecurityGater) InterceptAccept(c network.ConnMultiaddrs) bool {
@@ -31,16 +31,15 @@ func (g *SecurityGater) InterceptAccept(c network.ConnMultiaddrs) bool {
 }
 
 func (g *SecurityGater) InterceptSecured(dir network.Direction, p peer.ID, c network.ConnMultiaddrs) bool {
-	if dir == network.DirInbound {
-		allowed := g.wm.IsAllowed(p)
-		if !allowed {
-			log.Printf("gater: inbound secured rejected peer=%s", p)
-		}
-		return allowed
+	if isBootstrapPeer(p) {
+		return true
 	}
-	return true
+	allowed := g.wm.IsAllowed(p)
+	if !allowed {
+		log.Printf("gater: %s secured rejected peer=%s", dir, p)
+	}
+	return allowed
 }
-
 func (g *SecurityGater) InterceptUpgraded(c network.Conn) (bool, control.DisconnectReason) {
 	return true, 0
 }

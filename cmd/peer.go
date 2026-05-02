@@ -3,8 +3,12 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"slices"
+	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/niktin06sash/VoidLink/internal/config"
@@ -63,11 +67,7 @@ var addPeerCmd = &cobra.Command{
 			return err
 		}
 		fmt.Printf("Successfully added peer %s to %s\n", newID, finalPath)
-		if err := exec.Command("sudo", "pkill", "-HUP", "vlink").Run(); err != nil {
-			log.Printf("peer: failed to send SIGHUP to vlink err=%v", err)
-		} else {
-			fmt.Println("Sent SIGHUP to vlink process to reload whitelist.")
-		}
+		reloadRunningVlink()
 		return nil
 	}}
 var listPeersCmd = &cobra.Command{
@@ -127,10 +127,33 @@ var removePeerCmd = &cobra.Command{
 			return err
 		}
 		fmt.Printf("Successfully removed peer %s from %s\n", peerID, finalPath)
-		if err := exec.Command("sudo", "pkill", "-HUP", "vlink").Run(); err != nil {
-			log.Printf("peer: failed to send SIGHUP to vlink err=%v", err)
-		} else {
-			fmt.Println("Sent SIGHUP to vlink process to reload whitelist.")
-		}
+		reloadRunningVlink()
 		return nil
 	}}
+
+func reloadRunningVlink() {
+	out, err := exec.Command("pgrep", "-x", "vlink").Output()
+	if err != nil {
+		log.Printf("peer: whitelist updated (no reload); pgrep failed err=%v", err)
+		return
+	}
+	self := os.Getpid()
+	var signaled int
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		pid, err := strconv.Atoi(strings.TrimSpace(line))
+		if err != nil || pid <= 0 || pid == self {
+			continue
+		}
+		if err := syscall.Kill(pid, syscall.SIGHUP); err != nil {
+			log.Printf("peer: failed to send SIGHUP pid=%d err=%v", pid, err)
+			continue
+		}
+		signaled++
+	}
+	if signaled > 0 {
+		fmt.Printf("Sent SIGHUP to %d running vlink process(es) to reload whitelist.\n", signaled)
+	}
+}

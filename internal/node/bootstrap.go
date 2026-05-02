@@ -33,7 +33,8 @@ func (n *Node) bootstrap() error {
 		ok++
 	}
 	if ok == 0 {
-		return fmt.Errorf("bootstrap: no default bootstrap peers reachable")
+		log.Printf("bootstrap: WARNING no default bootstrap peers reachable; continuing without public DHT connectivity")
+		return nil
 	}
 	log.Printf("bootstrap: connected bootstrap_peers=%d/%d", ok, len(dht.DefaultBootstrapPeers))
 	return nil
