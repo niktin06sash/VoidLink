@@ -56,7 +56,6 @@ var upCmd = &cobra.Command{
 			return err
 		}
 		defer noda.Close()
-		noda.WatchSignal()
 		err = noda.Run()
 		if err != nil {
 			return err

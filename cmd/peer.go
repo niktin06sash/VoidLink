@@ -59,6 +59,9 @@ var addPeerCmd = &cobra.Command{
 		if cfg.Whitelist == nil {
 			cfg.Whitelist = make(map[string]config.PeerInfo)
 		}
+		if _, ok := cfg.Whitelist[newID]; ok {
+			return fmt.Errorf("peer %s already exists in whitelist", newID)
+		}
 		cfg.Whitelist[newID] = config.PeerInfo{
 			Name:    peerName,
 			AddedAt: time.Now().Format("2006-01-02 15:04:05"),
@@ -121,6 +124,9 @@ var removePeerCmd = &cobra.Command{
 		cfg, err := config.LoadConfig(finalPath)
 		if err != nil {
 			return err
+		}
+		if _, ok := cfg.Whitelist[peerID]; ok {
+			return fmt.Errorf("peer %s not found in whitelist", peerID)
 		}
 		delete(cfg.Whitelist, peerID)
 		if err := config.SaveConfig(finalPath, *cfg); err != nil {

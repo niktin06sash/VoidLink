@@ -20,6 +20,7 @@ func (n *Node) Run() error {
 		go n.startTunnel(s)
 	})
 	n.statusSocket()
+	n.watchSignal()
 	if n.role == config.Server {
 		log.Printf("node: role=server starting advertise...")
 		n.startServer()

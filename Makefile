@@ -5,7 +5,7 @@ BINARY=vlink
 CMD_DIR=./cmd/vlink
 LOCAL_RUN=./local-env.sh
 
-.PHONY: all build clean run-local status logs ping-test shell-s shell-c
+.PHONY: all build clean run-local status logs ping-test shell-s shell-c unit-test test-cover
 
 all: build
 
@@ -13,7 +13,7 @@ build:
 	@echo "==> Building $(BINARY)..."
 	go build -o $(BINARY) $(CMD_DIR)
 
-run-local: build
+run-local: unit-test build
 	@echo "==> Starting local netns environment..."
 	chmod +x $(LOCAL_RUN)
 	sudo -E $(LOCAL_RUN)
@@ -49,3 +49,11 @@ clean:
 	sudo rm -f /tmp/vlink-*.sock
 	sudo ip netns del $(NS_S) 2>/dev/null || true
 	sudo ip netns del $(NS_C) 2>/dev/null || true
+
+unit-test:
+	@echo "Running unit-tests with race detector..."
+	go test -v -race ./...
+
+test-cover:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out

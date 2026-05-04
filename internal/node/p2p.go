@@ -57,7 +57,8 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(quic.NewTransport),
-		libp2p.EnableHolePunching())
+		libp2p.EnableHolePunching(),
+		libp2p.EnableRelay())
 	if err != nil {
 		return nil, fmt.Errorf("error while create node: %w", err)
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/niktin06sash/VoidLink/internal/config"
 )
 
-func (n *Node) WatchSignal() {
+func (n *Node) watchSignal() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGHUP)
 	go func() {

@@ -21,7 +21,9 @@ func TunToStream(ctx context.Context, tun io.Reader, stream io.Writer, counter *
 				log.Printf("engine: tun read ended err=%v", err)
 				return
 			}
-			err = binary.Write(stream, binary.BigEndian, uint16(n))
+			header := make([]byte, 2)
+			binary.BigEndian.PutUint16(header, uint16(n))
+			_, err = stream.Write(header)
 			if err != nil {
 				bufPool.Put(buf)
 				log.Printf("engine: stream write header ended err=%v", err)
