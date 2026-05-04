@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -124,7 +125,7 @@ func SaveConfig(configPath string, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	err = os.WriteFile(configPath, yamlData, 0600)
+	err = os.WriteFile(configPath, yamlData, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
@@ -148,9 +149,15 @@ func createIdentity(targetPath string) (crypto.PrivKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key: %w", err)
 	}
-	err = os.WriteFile(targetPath, data, 0600)
+	err = os.WriteFile(targetPath, data, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 	return priv, nil
+}
+
+func GetSocketPath(configPath string) string {
+	ext := filepath.Ext(configPath)
+	pathWithoutExt := strings.TrimSuffix(configPath, ext)
+	return pathWithoutExt + ".sock"
 }

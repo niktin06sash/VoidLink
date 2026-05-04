@@ -3,20 +3,21 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-NS_S="vlink-s"
-NS_C="vlink-c"
-VETH_S="veth-s"
-VETH_C="veth-c"
+if [ -f "$ROOT_DIR/.env" ]; then
+    export $(grep -v '^#' "$ROOT_DIR/.env" | xargs)
+fi
 
-LINK_S_IP="192.168.100.1/30"
-LINK_C_IP="192.168.100.2/30"
-
-CFG_S="/tmp/vlink-s.yaml"
-CFG_C="/tmp/vlink-c.yaml"
-LOG_S="/tmp/vlink-s.log"
-LOG_C="/tmp/vlink-c.log"
-
-RENDEZVOUS_SECRET="${RENDEZVOUS_SECRET:-vlink-local-123}"
+NS_S="${NS_S}"
+NS_C="${NS_C}"
+VETH_S="${VETH_S}"
+VETH_C="${VETH_C}"
+LINK_S_IP="${LINK_S_IP}"
+LINK_C_IP="${LINK_C_IP}"
+CFG_S="${CFG_S}"
+CFG_C="${CFG_C}"
+LOG_S="${LOG_S}"
+LOG_C="${LOG_C}"
+RENDEZVOUS_SECRET="${RENDEZVOUS_SECRET}"
 
 SERVER_PID=""
 CLIENT_PID=""
@@ -36,10 +37,9 @@ trap cleanup INT TERM
 cd "${ROOT_DIR}"
 
 echo "==> Resetting configurations"
-sudo rm -f "${CFG_S}" "${CFG_C}"
-
-echo "==> Building vlink"
-go build -o vlink ./cmd/vlink
+sudo rm -f "${CFG_S}" "${CFG_C}" "${LOG_S}" "${LOG_C}"
+CONFIG_DIR=$(dirname "${CFG_S}")
+sudo rm -f "${CONFIG_DIR}/server.key" "${CONFIG_DIR}/client.key"
 
 echo "==> Resetting namespaces + veth (if any)"
 sudo pkill -f "./vlink up" 2>/dev/null || true
@@ -70,11 +70,11 @@ sudo ip netns exec "${NS_C}" ping -c 1 -W 1 192.168.100.1 >/dev/null
 echo "    OK: ${NS_S}<->${NS_C} link up"
 
 echo "==> Initializing configs"
-sudo ip netns exec "${NS_S}" ./vlink init server --secret "${RENDEZVOUS_SECRET}" --config "${CFG_S}" >/dev/null
-sudo ip netns exec "${NS_C}" ./vlink init client --secret "${RENDEZVOUS_SECRET}" --config "${CFG_C}" >/dev/null
+./vlink init server --secret "${RENDEZVOUS_SECRET}" --config "${CFG_S}" >/dev/null
+./vlink init client --secret "${RENDEZVOUS_SECRET}" --config "${CFG_C}" >/dev/null
 
-SERVER_ID="$(sudo ip netns exec "${NS_S}" ./vlink status server --config "${CFG_S}" | awk '/Peer ID:/{print $3}')"
-CLIENT_ID="$(sudo ip netns exec "${NS_C}" ./vlink status client --config "${CFG_C}" | awk '/Peer ID:/{print $3}')"
+SERVER_ID="$(./vlink status server --config "${CFG_S}" | awk '/Peer ID:/{print $3}')"
+CLIENT_ID="$(./vlink status client --config "${CFG_C}" | awk '/Peer ID:/{print $3}')"
 
 if [[ -z "${SERVER_ID}" || -z "${CLIENT_ID}" ]]; then
   echo "ERROR: failed to read Peer IDs"
@@ -85,15 +85,14 @@ echo "    Server PeerID: ${SERVER_ID}"
 echo "    Client PeerID: ${CLIENT_ID}"
 
 echo "==> Whitelisting peers"
-sudo ip netns exec "${NS_S}" ./vlink peer add server "${CLIENT_ID}" --name "client" --config "${CFG_S}" >/dev/null || true
-sudo ip netns exec "${NS_C}" ./vlink peer add client "${SERVER_ID}" --name "server" --config "${CFG_C}" >/dev/null || true
+./vlink peer add server "${CLIENT_ID}" --name "client" --config "${CFG_S}" >/dev/null || true
+./vlink peer add client "${SERVER_ID}" --name "server" --config "${CFG_C}" >/dev/null || true
 
 echo "==> Starting server + client"
 sudo ip netns exec "${NS_S}" ./vlink up server --config "${CFG_S}" >"${LOG_S}" 2>&1 &
 SERVER_PID="$!"
 sudo ip netns exec "${NS_C}" ./vlink up client --config "${CFG_C}" >"${LOG_C}" 2>&1 &
 CLIENT_PID="$!"
-
 echo "    Logs: ${LOG_S} (server), ${LOG_C} (client)"
 
 echo "==> Waiting for tunnel to become reachable"
@@ -120,15 +119,5 @@ sudo ip netns exec "${NS_S}" ping -c 3 -W 1 10.1.1.2
 
 echo "==> SUCCESS"
 echo "    vlink is still running. Press Ctrl+C to stop and cleanup."
-echo
-echo "    Helpful commands to run manually:"
-echo "      sudo ip netns exec ${NS_S} ip -br addr"
-echo "      sudo ip netns exec ${NS_C} ip -br addr"
-echo "      sudo ip netns exec ${NS_S} ping -c 3 10.1.1.2"
-echo "      sudo ip netns exec ${NS_C} ping -c 3 10.1.1.1"
-echo "      tail -f ${LOG_S}   # server logs"
-echo "      tail -f ${LOG_C}   # client logs"
-
-echo
 echo "==> Waiting (Ctrl+C to stop)"
 wait

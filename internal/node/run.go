@@ -19,6 +19,7 @@ func (n *Node) Run() error {
 		log.Printf("stream: inbound opened peer=%s", s.Conn().RemotePeer())
 		go n.startTunnel(s)
 	})
+	n.statusSocket()
 	if n.role == config.Server {
 		log.Printf("node: role=server starting advertise...")
 		n.startServer()

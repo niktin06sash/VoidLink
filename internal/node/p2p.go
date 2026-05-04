@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -30,7 +33,16 @@ type Node struct {
 	role       config.Role
 	mdns       mdns.Service
 	ctx        context.Context
-	path       string
+	sets       *nodeSettings
+}
+type nodeSettings struct {
+	path         string
+	tunnelActive int32
+	currentPeer  peer.ID
+	peerMu       sync.RWMutex
+	startTime    time.Time
+	rxBytes      uint64
+	txBytes      uint64
 }
 
 func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey crypto.PrivKey, path string) (*Node, error) {
@@ -44,7 +56,8 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 		),
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.Transport(tcp.NewTCPTransport),
-		libp2p.Transport(quic.NewTransport))
+		libp2p.Transport(quic.NewTransport),
+		libp2p.EnableHolePunching())
 	if err != nil {
 		return nil, fmt.Errorf("error while create node: %w", err)
 	}
@@ -64,6 +77,7 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 		return nil, fmt.Errorf("failed to create DHT: %w", err)
 	}
 	log.Printf("node: dht created mode=auto")
+	sets := &nodeSettings{path: path, startTime: time.Now()}
 	return &Node{
 		Host:       host,
 		DHT:        kdht,
@@ -73,7 +87,7 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 		role:       cfg.Role,
 		mdns:       ser,
 		ctx:        ctx,
-		path:       path,
+		sets:       sets,
 	}, nil
 }
 

@@ -5,9 +5,10 @@ import (
 	"encoding/binary"
 	"io"
 	"log"
+	"sync/atomic"
 )
 
-func TunToStream(ctx context.Context, tun io.Reader, stream io.Writer) {
+func TunToStream(ctx context.Context, tun io.Reader, stream io.Writer, counter *uint64) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -32,11 +33,12 @@ func TunToStream(ctx context.Context, tun io.Reader, stream io.Writer) {
 				log.Printf("engine: stream write payload ended err=%v", err)
 				return
 			}
+			atomic.AddUint64(counter, uint64(n))
 		}
 	}
 }
 
-func StreamToTun(ctx context.Context, tun io.Writer, stream io.Reader) {
+func StreamToTun(ctx context.Context, tun io.Writer, stream io.Reader, counter *uint64) {
 	header := make([]byte, 2)
 	for {
 		select {
@@ -60,12 +62,13 @@ func StreamToTun(ctx context.Context, tun io.Writer, stream io.Reader) {
 				log.Printf("engine: stream read payload ended err=%v", err)
 				return
 			}
-			_, err = tun.Write(buf[:packetLen])
+			n, err := tun.Write(buf[:packetLen])
 			bufPool.Put(buf)
 			if err != nil {
 				log.Printf("engine: tun write ended err=%v", err)
 				return
 			}
+			atomic.AddUint64(counter, uint64(n))
 		}
 	}
 }
