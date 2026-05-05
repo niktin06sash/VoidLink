@@ -103,7 +103,7 @@ func LoadConfig(path string) (*Config, error) {
 func GetPeerID(priv crypto.PrivKey) (string, error) {
 	id, err := peer.IDFromPrivateKey(priv)
 	if err != nil {
-		return "", fmt.Errorf("failet to get peer id from private key: %w", err)
+		return "", fmt.Errorf("failed to get peer id from private key: %w", err)
 	}
 	return id.String(), nil
 }

@@ -6,10 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	cid "github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	mh "github.com/multiformats/go-multihash"
 )
 
 func (n *Node) startClient() {
@@ -28,19 +29,37 @@ func (n *Node) tick() {
 	if atomic.LoadInt32(&n.sets.tunnelActive) == 1 {
 		return
 	}
-	routingDiscovery := routing.NewRoutingDiscovery(n.DHT)
-	peerChan, err := routingDiscovery.FindPeers(n.ctx, n.rendezvous)
+	conns := n.Host.Network().Conns()
+	log.Printf("client: total active connections: %d", len(conns))
+	for _, c := range conns {
+		log.Printf("   -> connected to: %s (Dir: %s)", c.RemotePeer(), c.Stat().Direction)
+	}
+	rtSize := n.DHT.RoutingTable().Size()
+	log.Printf("client: DHT Routing Table size: %d", rtSize)
+	prefix := cid.Prefix{
+		Version:  1,
+		Codec:    cid.Raw,
+		MhType:   mh.SHA2_256,
+		MhLength: -1,
+	}
+	key, err := prefix.Sum([]byte(n.rendezvous))
 	if err != nil {
-		log.Printf("client: find peers failed rendezvous=%s err=%v", n.rendezvous, err)
+		log.Printf("client: cid generation error: %v", err)
 		return
 	}
-	for p := range peerChan {
+	log.Printf("client: searching for key: %s (rendezvous='%s')", key.String(), n.rendezvous)
+	ctx, cancel := context.WithTimeout(n.ctx, time.Second*10)
+	defer cancel()
+	provChan := n.DHT.FindProvidersAsync(ctx, key, 1)
+	for p := range provChan {
 		if p.ID == n.Host.ID() || len(p.Addrs) == 0 {
 			continue
 		}
+		log.Println(p.ID)
 		if !n.wm.IsAllowed(p.ID) {
 			continue
 		}
+		n.Host.Peerstore().AddAddrs(p.ID, p.Addrs, time.Hour)
 		log.Printf("client: attempting stream peer=%s addrs=%d", p.ID, len(p.Addrs))
 		s, err := n.newTunnelStream(p.ID)
 		if err != nil {

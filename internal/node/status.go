@@ -61,16 +61,18 @@ func (n *Node) statusSocket() error {
 		return fmt.Errorf("socket: error while starts socket: %v", err)
 	}
 	go func() {
-		<-n.ctx.Done()
-		l.Close()
-		os.Remove(socketpath)
-	}()
-	go func() {
 		for {
+			select {
+			case <-n.ctx.Done():
+				l.Close()
+				os.Remove(socketpath)
+				return
+			default:
+			}
 			conn, err := l.Accept()
 			if err != nil {
 				log.Printf("socket: error while accepted connection: %v", err)
-				return
+				continue
 			}
 			go func(c net.Conn) {
 				defer c.Close()

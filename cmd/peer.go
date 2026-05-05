@@ -125,7 +125,7 @@ var removePeerCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if _, ok := cfg.Whitelist[peerID]; ok {
+		if _, ok := cfg.Whitelist[peerID]; !ok {
 			return fmt.Errorf("peer %s not found in whitelist", peerID)
 		}
 		delete(cfg.Whitelist, peerID)

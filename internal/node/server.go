@@ -3,12 +3,26 @@ package node
 import (
 	"log"
 
-	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	"github.com/libp2p/go-libp2p/p2p/discovery/util"
+	cid "github.com/ipfs/go-cid"
+	mh "github.com/multiformats/go-multihash"
 )
 
 func (n *Node) startServer() {
-	routingDiscovery := routing.NewRoutingDiscovery(n.DHT)
-	util.Advertise(n.ctx, routingDiscovery, n.rendezvous)
-	log.Printf("server: advertised rendezvous=%s ", n.rendezvous)
+	prefix := cid.Prefix{
+		Version:  1,
+		Codec:    cid.Raw,
+		MhType:   mh.SHA2_256,
+		MhLength: -1,
+	}
+	key, err := prefix.Sum([]byte(n.rendezvous))
+	if err != nil {
+		log.Printf("server: cid error: %v", err)
+		return
+	}
+	err = n.DHT.Provide(n.ctx, key, true)
+	if err != nil {
+		log.Printf("server: provide error: %v", err)
+	} else {
+		log.Printf("server: providing key=%s for rendezvous=%s", key.String(), n.rendezvous)
+	}
 }
