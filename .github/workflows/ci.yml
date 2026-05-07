@@ -36,4 +36,28 @@ jobs:
         with:
           name: voidlink
           path: ./vlink
-          retention-days: 5  
+          retention-days: 5
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: backend
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: voidlink
+
+      - name: Deploy to VPS
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          scp -i private_key -o StrictHostKeyChecking=no vlink $SSH_USER@$SSH_HOST:/home/$SSH_USER/vlink
+          ssh -i private_key -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "chmod +x /home/$SSH_USER/vlink"
+          rm private_key
