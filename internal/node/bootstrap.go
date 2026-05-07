@@ -11,16 +11,43 @@ import (
 )
 
 func (n *Node) bootstrap() error {
-	log.Printf("bootstrap: starting dht bootstrap...")
 	if err := n.DHT.Bootstrap(n.ctx); err != nil {
 		return fmt.Errorf("error while create bootstrap: %w", err)
 	}
-	log.Printf("bootstrap: dht bootstrap complete, connecting to default bootstrap peers=%d", len(dht.DefaultBootstrapPeers))
-	var ok int
+	c := n.connectBootstrapPeers()
+	if c == 0 {
+		log.Printf("bootstrap: WARNING no bootstrap peers reachable")
+		return nil
+	}
+	log.Printf("bootstrap: connected %d/%d peers.", c, len(dht.DefaultBootstrapPeers))
+	go func() {
+		ticker := time.NewTicker(2 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				log.Printf("bootstrap: re-bootstrapping DHT...")
+				err := n.DHT.Bootstrap(n.ctx)
+				if err != nil {
+					log.Printf("error while create bootstrap: %v", err)
+					continue
+				}
+				if n.DHT.RoutingTable().Size() < 3 {
+					n.connectBootstrapPeers()
+				}
+			case <-n.ctx.Done():
+				return
+			}
+		}
+	}()
+	return nil
+}
+
+func (n *Node) connectBootstrapPeers() int {
+	var counter int
 	for _, addr := range dht.DefaultBootstrapPeers {
 		pi, err := peer.AddrInfoFromP2pAddr(addr)
 		if err != nil {
-			log.Printf("bootstrap: parse bootstrap peer failed addr=%s err=%v", addr, err)
 			continue
 		}
 		ctx, cancel := context.WithTimeout(n.ctx, 30*time.Second)
@@ -30,12 +57,8 @@ func (n *Node) bootstrap() error {
 			log.Printf("bootstrap: connect failed peer=%s err=%v", pi.ID, err)
 			continue
 		}
-		ok++
+		counter++
+		log.Printf("bootstrap: connected peer=%s", pi.ID)
 	}
-	if ok == 0 {
-		log.Printf("bootstrap: WARNING no default bootstrap peers reachable; continuing without public DHT connectivity")
-		return nil
-	}
-	log.Printf("bootstrap: connected bootstrap_peers=%d/%d", ok, len(dht.DefaultBootstrapPeers))
-	return nil
+	return counter
 }

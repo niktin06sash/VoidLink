@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	mh "github.com/multiformats/go-multihash"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -34,26 +36,25 @@ type Node struct {
 	mdns       mdns.Service
 	ctx        context.Context
 	sets       *nodeSettings
+	key        cid.Cid
 }
 type nodeSettings struct {
-	path         string
-	tunnelActive int32
-	currentPeer  peer.ID
-	peerMu       sync.RWMutex
-	startTime    time.Time
-	rxBytes      uint64
-	txBytes      uint64
+	path          string
+	tunnelActive  int32
+	currentPeer   peer.ID
+	peerMu        sync.RWMutex
+	startTime     time.Time
+	rxBytes       uint64
+	txBytes       uint64
+	serverAddress string
 }
 
-func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey crypto.PrivKey, path string) (*Node, error) {
+func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey crypto.PrivKey, path string, serveradr string) (*Node, error) {
 	wgh := whitelist.NewWhitelistManager(cfg.Whitelist)
 	host, err := libp2p.New(
 		libp2p.ConnectionGater(gater.NewSecurityGater(wgh)),
 		libp2p.Identity(privkey),
-		libp2p.ListenAddrStrings(
-			"/ip4/0.0.0.0/tcp/0",
-			"/ip4/0.0.0.0/udp/0/quic-v1",
-		),
+		libp2p.ListenAddrStrings(buildListenAddrs(cfg)...),
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(quic.NewTransport),
@@ -73,15 +74,20 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 		return nil, fmt.Errorf("failed to start mDNS: %w", err)
 	}
 	log.Printf("node: mdns started service=%s", implmDNS.MDNSName)
-	kdht, err := dht.New(ctx, host, dht.Mode(dht.ModeAuto))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create DHT: %w", err)
+	sets := &nodeSettings{path: path, startTime: time.Now(), serverAddress: serveradr}
+	prefix := cid.Prefix{
+		Version:  1,
+		Codec:    cid.Raw,
+		MhType:   mh.SHA2_256,
+		MhLength: -1,
 	}
-	log.Printf("node: dht created mode=auto")
-	sets := &nodeSettings{path: path, startTime: time.Now()}
+	key, err := prefix.Sum([]byte(cfg.Rendezvous))
+	if err != nil {
+		log.Printf("node: cid generation error: %v", err)
+		return nil, err
+	}
 	return &Node{
 		Host:       host,
-		DHT:        kdht,
 		Tun:        tun,
 		rendezvous: cfg.Rendezvous,
 		wm:         wgh,
@@ -89,11 +95,26 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 		mdns:       ser,
 		ctx:        ctx,
 		sets:       sets,
+		key:        key,
 	}, nil
 }
 
 func (n *Node) Close() error {
-	n.mdns.Close()
-	n.DHT.Close()
+	if n.mdns != nil {
+		n.mdns.Close()
+	}
+	if n.DHT != nil {
+		n.DHT.Close()
+	}
 	return n.Host.Close()
+}
+func buildListenAddrs(cfg *config.Config) []string {
+	port := 0
+	if cfg.ListenPort != 0 {
+		port = cfg.ListenPort
+	}
+	return []string{
+		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port),
+		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", port),
+	}
 }

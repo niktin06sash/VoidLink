@@ -26,6 +26,8 @@ func Execute() {
 var secretPhrase string
 var cfgFile string
 var peerName string
+var serverAddress string
+var port int
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
@@ -36,6 +38,8 @@ func init() {
 	peerCmd.AddCommand(listPeersCmd)
 	peerCmd.AddCommand(removePeerCmd)
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "path to config file (default is $HOME/.voidlink/role.yaml)")
-	addPeerCmd.Flags().StringVarP(&peerName, "name", "n", "new-device", "Friendly name for the peer")
+	addPeerCmd.Flags().StringVarP(&peerName, "name", "n", "new-device", "friendly name for the peer")
+	upCmd.Flags().StringVar(&serverAddress, "server-address", "", "flag to direct connect to server")
+	initCmd.Flags().IntVar(&port, "port", 0, "listening port for p2p connections (default random)")
 	initCmd.Flags().StringVarP(&secretPhrase, "secret", "s", "", "secret phrase for rendezvous (leave empty for random)")
 }

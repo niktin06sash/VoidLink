@@ -40,7 +40,7 @@ var initCmd = &cobra.Command{
 			finalPath = config.GetConfigPath(userRole)
 		}
 		log.Printf("init: role=%s config=%s", userRole, finalPath)
-		cfg, priv, err := config.InitConfig(userRole, secretPhrase, finalPath)
+		cfg, priv, err := config.InitConfig(userRole, secretPhrase, finalPath, port)
 		if err != nil {
 			return err
 		}

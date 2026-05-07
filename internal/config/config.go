@@ -29,6 +29,7 @@ type Config struct {
 	Whitelist     map[string]PeerInfo `yaml:"whitelist"`
 	KeyPath       string              `yaml:"key_path"`
 	Rendezvous    string              `yaml:"rendezvous"`
+	ListenPort    int                 `yaml:"listen_port,omitempty"`
 }
 
 const serverLocalIP = "10.1.1.1"
@@ -36,7 +37,7 @@ const clientLocalIP = "10.1.1.2"
 const clientInterface = "void1"
 const serverInterface = "void0"
 
-func InitConfig(role string, secret string, path string) (*Config, crypto.PrivKey, error) {
+func InitConfig(role string, secret string, path string, port int) (*Config, crypto.PrivKey, error) {
 	configDir := filepath.Dir(path)
 	keyPath := filepath.Join(configDir, role+".key")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -53,6 +54,7 @@ func InitConfig(role string, secret string, path string) (*Config, crypto.PrivKe
 			ifaceName = serverInterface
 		}
 		cfg = &Config{
+			ListenPort:    port,
 			Role:          Role(role),
 			LocalIP:       localIP,
 			InterfaceName: ifaceName,

@@ -51,7 +51,7 @@ var upCmd = &cobra.Command{
 			return err
 		}
 		defer tunnel.Close()
-		noda, err := node.NewNode(cmd.Context(), cfg, tunnel, priv, finalPath)
+		noda, err := node.NewNode(cmd.Context(), cfg, tunnel, priv, finalPath, serverAddress)
 		if err != nil {
 			return err
 		}

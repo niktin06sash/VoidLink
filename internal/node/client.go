@@ -6,14 +6,18 @@ import (
 	"sync/atomic"
 	"time"
 
-	cid "github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	mh "github.com/multiformats/go-multihash"
+	"github.com/multiformats/go-multiaddr"
 )
 
 func (n *Node) startClient() {
+	if n.sets.serverAddress != "" {
+		n.direct()
+	} else {
+		n.discover()
+	}
 	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -21,37 +25,56 @@ func (n *Node) startClient() {
 		case <-n.ctx.Done():
 			return
 		case <-ticker.C:
-			n.tick()
+			if n.sets.serverAddress != "" {
+				n.direct()
+			} else {
+				n.discover()
+			}
 		}
 	}
 }
-func (n *Node) tick() {
+func (n *Node) direct() {
+	if atomic.LoadInt32(&n.sets.tunnelActive) == 1 {
+		return
+	}
+	maddr, err := multiaddr.NewMultiaddr(n.sets.serverAddress)
+	if err != nil {
+		log.Printf("client: invalid server address: %v", err)
+		return
+	}
+	pi, err := peer.AddrInfoFromP2pAddr(maddr)
+	if err != nil {
+		log.Printf("client: parse server address failed: %v", err)
+		return
+	}
+	if !n.wm.IsAllowed(pi.ID) {
+		log.Printf("client: server peer not in whitelist: %s", pi.ID)
+		return
+	}
+	if err := n.Host.Connect(n.ctx, *pi); err != nil {
+		log.Printf("client: direct connect failed: %v", err)
+		return
+	}
+	s, err := n.newTunnelStream(pi.ID)
+	if err != nil {
+		log.Printf("client: stream failed: %v", err)
+		return
+	}
+	log.Printf("client: direct tunnel established peer=%s", pi.ID)
+	n.startTunnel(s)
+}
+func (n *Node) discover() {
 	if atomic.LoadInt32(&n.sets.tunnelActive) == 1 {
 		return
 	}
 	conns := n.Host.Network().Conns()
-	log.Printf("client: total active connections: %d", len(conns))
-	for _, c := range conns {
-		log.Printf("   -> connected to: %s (Dir: %s)", c.RemotePeer(), c.Stat().Direction)
-	}
-	rtSize := n.DHT.RoutingTable().Size()
-	log.Printf("client: DHT Routing Table size: %d", rtSize)
-	prefix := cid.Prefix{
-		Version:  1,
-		Codec:    cid.Raw,
-		MhType:   mh.SHA2_256,
-		MhLength: -1,
-	}
-	key, err := prefix.Sum([]byte(n.rendezvous))
-	if err != nil {
-		log.Printf("client: cid generation error: %v", err)
-		return
-	}
-	log.Printf("client: searching for key: %s (rendezvous='%s')", key.String(), n.rendezvous)
+	log.Printf("client: total active connections: %d, DHT RT size: %d", len(conns), n.DHT.RoutingTable().Size())
+	log.Printf("client: searching for key: %s (rendezvous='%s')", n.key.String(), n.rendezvous)
 	ctx, cancel := context.WithTimeout(n.ctx, time.Second*10)
 	defer cancel()
-	provChan := n.DHT.FindProvidersAsync(ctx, key, 1)
+	provChan := n.DHT.FindProvidersAsync(ctx, n.key, 1)
 	for p := range provChan {
+		log.Printf("client: found provider: id=%s addrs=%d allowed=%v", p.ID, len(p.Addrs), n.wm.IsAllowed(p.ID))
 		if p.ID == n.Host.ID() || len(p.Addrs) == 0 {
 			continue
 		}
