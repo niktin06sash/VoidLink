@@ -39,14 +39,20 @@ type Node struct {
 	key        cid.Cid
 }
 type nodeSettings struct {
-	path          string
-	tunnelActive  int32
-	currentPeer   peer.ID
-	peerMu        sync.RWMutex
-	startTime     time.Time
-	rxBytes       uint64
-	txBytes       uint64
-	serverAddress string
+	path           string
+	tunnelActive   int32
+	currentPeer    peer.ID
+	peerMu         sync.RWMutex
+	startTime      time.Time
+	rxBytes        uint64
+	txBytes        uint64
+	serverAddress  string
+	lastRxBytes    uint64
+	lastTxBytes    uint64
+	lastCheckTime  time.Time
+	currentRxSpeed float64
+	currentTxSpeed float64
+	speedMu        sync.Mutex
 }
 
 func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey crypto.PrivKey, path string, serveradr string) (*Node, error) {

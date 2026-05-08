@@ -51,6 +51,12 @@ var upCmd = &cobra.Command{
 			return err
 		}
 		defer tunnel.Close()
+		if routeAll && config.Role(role) == config.Client && serverAddress != "" {
+			if err := tunnel.AddRoutes(serverAddress); err != nil {
+				return err
+			}
+			defer tunnel.RemoveRoutes()
+		}
 		noda, err := node.NewNode(cmd.Context(), cfg, tunnel, priv, finalPath, serverAddress)
 		if err != nil {
 			return err

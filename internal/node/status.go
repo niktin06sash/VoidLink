@@ -60,6 +60,7 @@ func (n *Node) statusSocket() error {
 	if err != nil {
 		return fmt.Errorf("socket: error while starts socket: %v", err)
 	}
+	n.startStatsInformer()
 	go func() {
 		for {
 			select {
@@ -129,8 +130,10 @@ func (n *Node) newStatusResponse() StatusResponse {
 	rx := atomic.LoadUint64(&n.sets.rxBytes)
 	tx := atomic.LoadUint64(&n.sets.txBytes)
 	uptime := time.Since(n.sets.startTime)
-	rxSpeed := float64(rx) / uptime.Seconds()
-	txSpeed := float64(tx) / uptime.Seconds()
+	n.sets.speedMu.Lock()
+	rxSpeed := n.sets.currentRxSpeed
+	txSpeed := n.sets.currentTxSpeed
+	n.sets.speedMu.Unlock()
 	var publicAddrs []string
 	for _, addr := range n.Host.Addrs() {
 		if !manet.IsThinWaist(addr) || manet.IsPublicAddr(addr) {
@@ -149,4 +152,36 @@ func (n *Node) newStatusResponse() StatusResponse {
 		TunnelActive: atomic.LoadInt32(&n.sets.tunnelActive) == 1,
 		CurrentPeer:  cp,
 	}
+}
+func (n *Node) startStatsInformer() {
+	n.sets.speedMu.Lock()
+	n.sets.lastRxBytes = atomic.LoadUint64(&n.sets.rxBytes)
+	n.sets.lastTxBytes = atomic.LoadUint64(&n.sets.txBytes)
+	n.sets.lastCheckTime = time.Now()
+	n.sets.speedMu.Unlock()
+	ticker := time.NewTicker(time.Second * 1)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-n.ctx.Done():
+				return
+			case <-ticker.C:
+				now := time.Now()
+				currRx := atomic.LoadUint64(&n.sets.rxBytes)
+				currTx := atomic.LoadUint64(&n.sets.txBytes)
+
+				n.sets.speedMu.Lock()
+				duration := now.Sub(n.sets.lastCheckTime).Seconds()
+				if duration > 0 {
+					n.sets.currentRxSpeed = float64(currRx-n.sets.lastRxBytes) / duration
+					n.sets.currentTxSpeed = float64(currTx-n.sets.lastTxBytes) / duration
+				}
+				n.sets.lastRxBytes = currRx
+				n.sets.lastTxBytes = currTx
+				n.sets.lastCheckTime = now
+				n.sets.speedMu.Unlock()
+			}
+		}
+	}()
 }
