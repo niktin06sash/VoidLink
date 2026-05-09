@@ -29,6 +29,7 @@ var peerName string
 var serverAddress string
 var port int
 var routeAll bool
+var routeBlocked bool
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
@@ -38,7 +39,8 @@ func init() {
 	peerCmd.AddCommand(addPeerCmd)
 	peerCmd.AddCommand(listPeersCmd)
 	peerCmd.AddCommand(removePeerCmd)
-	upCmd.Flags().BoolVar(&routeAll, "route-all", false, "route all traffic through VPN")
+	upCmd.Flags().BoolVar(&routeBlocked, "route-blocked", false, "route blocked resources through VoidLink")
+	upCmd.Flags().BoolVar(&routeAll, "route-all", false, "route all traffic through VoidLink")
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "path to config file (default is $HOME/.voidlink/role.yaml)")
 	addPeerCmd.Flags().StringVarP(&peerName, "name", "n", "new-device", "friendly name for the peer")
 	upCmd.Flags().StringVar(&serverAddress, "server-address", "", "flag to direct connect to server")

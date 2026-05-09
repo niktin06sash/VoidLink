@@ -52,10 +52,16 @@ var upCmd = &cobra.Command{
 		}
 		defer tunnel.Close()
 		if routeAll && config.Role(role) == config.Client && serverAddress != "" {
-			if err := tunnel.AddRoutes(serverAddress); err != nil {
+			if err := tunnel.AddAllRoutes(serverAddress); err != nil {
 				return err
 			}
-			defer tunnel.RemoveRoutes()
+			defer tunnel.RemoveAllRoutes()
+		}
+		if routeBlocked && config.Role(role) == config.Client && serverAddress != "" {
+			if err := tunnel.AddBlockedRoutes(cmd.Context()); err != nil {
+				return err
+			}
+			defer tunnel.RemoveBlockedRoutes()
 		}
 		noda, err := node.NewNode(cmd.Context(), cfg, tunnel, priv, finalPath, serverAddress)
 		if err != nil {

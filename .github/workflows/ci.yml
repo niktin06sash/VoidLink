@@ -58,6 +58,7 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
+          ssh -i private_key -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "sudo systemctl stop voidlink"
           scp -i private_key -o StrictHostKeyChecking=no vlink $SSH_USER@$SSH_HOST:/home/$SSH_USER/vlink
           ssh -i private_key -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "chmod +x /home/$SSH_USER/vlink && sudo systemctl restart voidlink"
           rm private_key
