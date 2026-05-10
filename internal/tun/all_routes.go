@@ -3,22 +3,14 @@ package tun
 import (
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"strings"
 )
-
-const etcResolvConf = "/etc/resolv.conf"
 
 func (t *Tun) AddAllRoutes(serveraddr string) error {
 	serverIP, err := extractIP(serveraddr)
 	if err != nil {
 		return err
-	}
-	oldData, err := os.ReadFile(etcResolvConf)
-	if err == nil {
-		t.originalDNS = make([]byte, len(oldData))
-		copy(t.originalDNS, oldData)
 	}
 	gateway, gwIface, err := getDefaultGateway()
 	if err != nil {
@@ -39,9 +31,8 @@ func (t *Tun) AddAllRoutes(serveraddr string) error {
 			return fmt.Errorf("command failed %v: %w (output=%s)", args, err, strings.TrimSpace(string(out)))
 		}
 	}
-	err = os.WriteFile(etcResolvConf, []byte("nameserver 8.8.8.8\n"), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write DNS configuration: %w", err)
+	if err := t.setDNS("8.8.8.8"); err != nil {
+		log.Printf("tun: failed to set DNS: %v", err)
 	}
 	log.Printf("tun: added routes to server %s via gateway %s dev %s", serverIP, gateway, gwIface)
 	return nil
@@ -60,17 +51,7 @@ func (t *Tun) RemoveAllRoutes() {
 			log.Printf("tun: failed to remove route: %v", err)
 		}
 	}
-	if len(t.originalDNS) > 0 {
-		err := os.WriteFile(etcResolvConf, t.originalDNS, 0644)
-		if err != nil {
-			log.Printf("tun: failed to restore backup DNS: %v", err)
-		} else {
-			log.Println("tun: DNS restored from backup")
-		}
-	} else {
-		os.WriteFile(etcResolvConf, []byte("nameserver "+t.gateway+"\n"), 0644)
-		log.Println("tun: DNS set to gateway")
-	}
+	t.restoreDNS()
 }
 func extractIP(addr string) (string, error) {
 	parts := strings.Split(addr, "/")

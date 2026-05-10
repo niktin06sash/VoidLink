@@ -16,7 +16,6 @@ type Tun struct {
 	gateway          string
 	gwIface          string
 	serverIP         string
-	originalDNS      []byte
 	antifilterRoutes []string
 	defaultRoutes    []string
 	routePath        string
@@ -67,4 +66,27 @@ func (t *Tun) applySettings(cfg *config.Config) error {
 
 func (t *Tun) Close() error {
 	return t.Iface.Close()
+}
+
+func (t *Tun) setDNS(dns string) error {
+	log.Printf("tun: setting DNS to %s for interface %s", dns, t.Iface.Name())
+	err := exec.Command("resolvectl", "dns", t.Iface.Name(), dns).Run()
+	if err != nil {
+		return fmt.Errorf("resolvectl dns: %w", err)
+	}
+	err = exec.Command("resolvectl", "domain", t.Iface.Name(), "~.").Run()
+	if err != nil {
+		return fmt.Errorf("resolvectl domain: %w", err)
+	}
+	log.Printf("tun: DNS set to %s", dns)
+	return nil
+}
+
+func (t *Tun) restoreDNS() {
+	err := exec.Command("resolvectl", "revert", t.Iface.Name()).Run()
+	if err != nil {
+		log.Printf("tun: failed to restore DNS: %v", err)
+	} else {
+		log.Printf("tun: DNS restored")
+	}
 }

@@ -59,6 +59,9 @@ func (t *Tun) AddSplitRoutes(ctx context.Context, routePath string) error {
 		}
 	}
 	t.routePath = routePath
+	if err := t.setDNS("8.8.8.8"); err != nil {
+		log.Printf("tun: failed to set DNS: %v", err)
+	}
 	log.Printf("tun: split routes added antifilter=%d/%d default=%d/%d",
 		addedAntifilter, len(antifilter), addedDefault, len(defRoutes))
 	return nil
@@ -82,7 +85,8 @@ func (t *Tun) RemoveSplitedRoutes() {
 	}
 	t.antifilterRoutes = nil
 	t.defaultRoutes = nil
-	log.Printf("tun: split routes removed")
+	log.Println("tun: split routes removed")
+	t.restoreDNS()
 }
 
 func (t *Tun) ReloadSplitedRoutes() error {
