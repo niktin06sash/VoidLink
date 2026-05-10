@@ -29,7 +29,7 @@ var peerName string
 var serverAddress string
 var port int
 var routeAll bool
-var routeBlocked bool
+var routeSplit bool
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
@@ -39,9 +39,13 @@ func init() {
 	peerCmd.AddCommand(addPeerCmd)
 	peerCmd.AddCommand(listPeersCmd)
 	peerCmd.AddCommand(removePeerCmd)
-	upCmd.Flags().BoolVar(&routeBlocked, "route-blocked", false, "route blocked resources through VoidLink")
+	rootCmd.AddCommand(routeCmd)
+	routeCmd.AddCommand(addRouteCmd)
+	routeCmd.AddCommand(removeRouteCmd)
+	routeCmd.AddCommand(listRoutesCmd)
+	upCmd.Flags().BoolVar(&routeSplit, "route-split", false, "route split resources through VoidLink")
 	upCmd.Flags().BoolVar(&routeAll, "route-all", false, "route all traffic through VoidLink")
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "path to config file (default is $HOME/.voidlink/role.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "path to config directory (default is $HOME/.voidlink)")
 	addPeerCmd.Flags().StringVarP(&peerName, "name", "n", "new-device", "friendly name for the peer")
 	upCmd.Flags().StringVar(&serverAddress, "server-address", "", "flag to direct connect to server")
 	initCmd.Flags().IntVar(&port, "port", 0, "listening port for p2p connections (default random)")

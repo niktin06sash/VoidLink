@@ -28,16 +28,17 @@ var upCmd = &cobra.Command{
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		role := args[0]
-		finalPath := cfgFile
-		if finalPath == "" {
-			finalPath = config.GetConfigPath(role)
+		finalDir := cfgFile
+		if finalDir == "" {
+			finalDir = config.GetConfigDir()
 		}
-		log.Printf("up: role=%s config=%s", role, finalPath)
+		finalPath := config.GetConfigFilePath(finalDir, role)
+		log.Printf("up: role=%s config=%s", role, finalDir)
 		cfg, err := config.LoadConfig(finalPath)
 		if err != nil {
 			return err
 		}
-		priv, err := config.LoadIdentity(cfg.KeyPath, finalPath)
+		priv, err := config.LoadIdentity(cfg.KeyPath)
 		if err != nil {
 			return err
 		}
@@ -57,13 +58,14 @@ var upCmd = &cobra.Command{
 			}
 			defer tunnel.RemoveAllRoutes()
 		}
-		if routeBlocked && config.Role(role) == config.Client && serverAddress != "" {
-			if err := tunnel.AddBlockedRoutes(cmd.Context()); err != nil {
+		if routeSplit && config.Role(role) == config.Client && serverAddress != "" {
+			routepath := config.GetRoutesFilePath(finalDir)
+			if err := tunnel.AddSplitRoutes(cmd.Context(), routepath); err != nil {
 				return err
 			}
-			defer tunnel.RemoveBlockedRoutes()
+			defer tunnel.RemoveSplitedRoutes()
 		}
-		noda, err := node.NewNode(cmd.Context(), cfg, tunnel, priv, finalPath, serverAddress)
+		noda, err := node.NewNode(cmd.Context(), cfg, tunnel, priv, finalPath, serverAddress, routeSplit)
 		if err != nil {
 			return err
 		}

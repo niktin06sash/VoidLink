@@ -26,6 +26,11 @@ func (n *Node) watchSignal() {
 				}
 				n.wm.Update(newCfg.Whitelist)
 				log.Printf("config: whitelist reloaded entries=%d", len(newCfg.Whitelist))
+				if n.sets.routeSplited {
+					if err := n.Tun.ReloadSplitedRoutes(); err != nil {
+						log.Printf("config: routes reload failed err=%v", err)
+					}
+				}
 			}
 		}
 	}()

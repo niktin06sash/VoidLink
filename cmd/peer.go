@@ -48,10 +48,11 @@ var addPeerCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		role := args[0]
 		newID := args[1]
-		finalPath := cfgFile
-		if finalPath == "" {
-			finalPath = config.GetConfigPath(role)
+		finalDir := cfgFile
+		if finalDir == "" {
+			finalDir = config.GetConfigDir()
 		}
+		finalPath := config.GetConfigFilePath(finalDir, role)
 		cfg, err := config.LoadConfig(finalPath)
 		if err != nil {
 			return err
@@ -88,10 +89,11 @@ var listPeersCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		role := args[0]
-		finalPath := cfgFile
-		if finalPath == "" {
-			finalPath = config.GetConfigPath(role)
+		finalDir := cfgFile
+		if finalDir == "" {
+			finalDir = config.GetConfigDir()
 		}
+		finalPath := config.GetConfigFilePath(finalDir, role)
 		cfg, err := config.LoadConfig(finalPath)
 		if err != nil {
 			return err
@@ -117,10 +119,11 @@ var removePeerCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		role := args[0]
 		peerID := args[1]
-		finalPath := cfgFile
-		if finalPath == "" {
-			finalPath = config.GetConfigPath(role)
+		finalDir := cfgFile
+		if finalDir == "" {
+			finalDir = config.GetConfigDir()
 		}
+		finalPath := config.GetConfigFilePath(finalDir, role)
 		cfg, err := config.LoadConfig(finalPath)
 		if err != nil {
 			return err

@@ -8,12 +8,14 @@ import (
 	"strings"
 )
 
+const etcResolvConf = "/etc/resolv.conf"
+
 func (t *Tun) AddAllRoutes(serveraddr string) error {
 	serverIP, err := extractIP(serveraddr)
 	if err != nil {
 		return err
 	}
-	oldData, err := os.ReadFile("/etc/resolv.conf")
+	oldData, err := os.ReadFile(etcResolvConf)
 	if err == nil {
 		t.originalDNS = make([]byte, len(oldData))
 		copy(t.originalDNS, oldData)
@@ -27,7 +29,7 @@ func (t *Tun) AddAllRoutes(serveraddr string) error {
 	t.serverIP = serverIP
 	commands := [][]string{
 		{"ip", "route", "add", serverIP + "/32", "via", gateway, "dev", gwIface},
-		{"ip", "route", "add", "default", "via", "10.1.1.1", "dev", t.Iface.Name(), "metric", metric},
+		{"ip", "route", "add", "default", "via", serverLocalIP, "dev", t.Iface.Name(), "metric", metric},
 	}
 	for _, args := range commands {
 		cmd := exec.Command(args[0], args[1:]...)
@@ -37,7 +39,7 @@ func (t *Tun) AddAllRoutes(serveraddr string) error {
 			return fmt.Errorf("command failed %v: %w (output=%s)", args, err, strings.TrimSpace(string(out)))
 		}
 	}
-	err = os.WriteFile("/etc/resolv.conf", []byte("nameserver 8.8.8.8\n"), 0644)
+	err = os.WriteFile(etcResolvConf, []byte("nameserver 8.8.8.8\n"), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write DNS configuration: %w", err)
 	}
@@ -49,7 +51,7 @@ func (t *Tun) RemoveAllRoutes() {
 		return
 	}
 	commands := [][]string{
-		{"ip", "route", "del", "default", "via", "10.1.1.1", "dev", t.Iface.Name()},
+		{"ip", "route", "del", "default", "via", serverLocalIP, "dev", t.Iface.Name()},
 		{"ip", "route", "del", t.serverIP + "/32"},
 	}
 	for _, args := range commands {
@@ -59,14 +61,14 @@ func (t *Tun) RemoveAllRoutes() {
 		}
 	}
 	if len(t.originalDNS) > 0 {
-		err := os.WriteFile("/etc/resolv.conf", t.originalDNS, 0644)
+		err := os.WriteFile(etcResolvConf, t.originalDNS, 0644)
 		if err != nil {
 			log.Printf("tun: failed to restore backup DNS: %v", err)
 		} else {
 			log.Println("tun: DNS restored from backup")
 		}
 	} else {
-		os.WriteFile("/etc/resolv.conf", []byte("nameserver "+t.gateway+"\n"), 0644)
+		os.WriteFile(etcResolvConf, []byte("nameserver "+t.gateway+"\n"), 0644)
 		log.Println("tun: DNS set to gateway")
 	}
 }

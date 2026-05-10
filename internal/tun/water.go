@@ -12,16 +12,19 @@ import (
 )
 
 type Tun struct {
-	Iface         *water.Interface
-	gateway       string
-	gwIface       string
-	serverIP      string
-	originalDNS   []byte
-	blockedRoutes []string
+	Iface            *water.Interface
+	gateway          string
+	gwIface          string
+	serverIP         string
+	originalDNS      []byte
+	antifilterRoutes []string
+	defaultRoutes    []string
+	routePath        string
 }
 
 const MTU = 1400
 const metric = "500"
+const serverLocalIP = "10.1.1.1"
 
 func NewTun(cfg *config.Config) (*Tun, error) {
 	waterconf := water.Config{DeviceType: water.TUN}

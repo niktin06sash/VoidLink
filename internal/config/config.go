@@ -3,8 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -37,10 +35,10 @@ const clientLocalIP = "10.1.1.2"
 const clientInterface = "void1"
 const serverInterface = "void0"
 
-func InitConfig(role string, secret string, path string, port int) (*Config, crypto.PrivKey, error) {
-	configDir := filepath.Dir(path)
-	keyPath := filepath.Join(configDir, role+".key")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+func InitConfig(role string, secret string, dir string, port int) (*Config, crypto.PrivKey, error) {
+	path := GetConfigFilePath(dir, role)
+	keyPath := GetKeyPath(dir, role)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, nil, fmt.Errorf("failed to create config dir: %w", err)
 	}
 	var cfg *Config
@@ -59,7 +57,7 @@ func InitConfig(role string, secret string, path string, port int) (*Config, cry
 			LocalIP:       localIP,
 			InterfaceName: ifaceName,
 			Whitelist:     map[string]PeerInfo{},
-			KeyPath:       role + ".key",
+			KeyPath:       keyPath,
 			Rendezvous:    secret,
 		}
 		if err := SaveConfig(path, *cfg); err != nil {
@@ -78,16 +76,18 @@ func InitConfig(role string, secret string, path string, port int) (*Config, cry
 			return nil, nil, err
 		}
 	} else {
-		priv, err = LoadIdentity(cfg.KeyPath, path)
+		priv, err = LoadIdentity(keyPath)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
+	routesPath := GetRoutesFilePath(dir)
+	if _, err := os.Stat(routesPath); os.IsNotExist(err) {
+		if err := writeDefaultRoutes(routesPath); err != nil {
+			return nil, nil, fmt.Errorf("failed to create default routes: %v", err)
+		}
+	}
 	return cfg, priv, nil
-}
-
-func GetConfigPath(role string) string {
-	return filepath.Join(getHomeDir(), ".voidlink", role+".yaml")
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -109,10 +109,8 @@ func GetPeerID(priv crypto.PrivKey) (string, error) {
 	}
 	return id.String(), nil
 }
-func LoadIdentity(keypath, targetPath string) (crypto.PrivKey, error) {
-	configDir := filepath.Dir(targetPath)
-	actualKeyPath := filepath.Join(configDir, keypath)
-	data, err := os.ReadFile(actualKeyPath)
+func LoadIdentity(keypath string) (crypto.PrivKey, error) {
+	data, err := os.ReadFile(keypath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key: %w", err)
 	}
@@ -132,34 +130,4 @@ func SaveConfig(configPath string, cfg Config) error {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 	return nil
-}
-func getHomeDir() string {
-	if os.Geteuid() == 0 {
-		if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
-			return "/home/" + sudoUser
-		}
-	}
-	home, _ := os.UserHomeDir()
-	return home
-}
-func createIdentity(targetPath string) (crypto.PrivKey, error) {
-	priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
-	if err != nil {
-		return nil, fmt.Errorf("key generation error: %w", err)
-	}
-	data, err := crypto.MarshalPrivateKey(priv)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal private key: %w", err)
-	}
-	err = os.WriteFile(targetPath, data, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write file: %w", err)
-	}
-	return priv, nil
-}
-
-func GetSocketPath(configPath string) string {
-	ext := filepath.Ext(configPath)
-	pathWithoutExt := strings.TrimSuffix(configPath, ext)
-	return pathWithoutExt + ".sock"
 }

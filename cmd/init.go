@@ -35,12 +35,12 @@ var initCmd = &cobra.Command{
 			}
 			secretPhrase = "vlink-" + s
 		}
-		finalPath := cfgFile
-		if finalPath == "" {
-			finalPath = config.GetConfigPath(userRole)
+		finalDir := cfgFile
+		if finalDir == "" {
+			finalDir = config.GetConfigDir()
 		}
-		log.Printf("init: role=%s config=%s", userRole, finalPath)
-		cfg, priv, err := config.InitConfig(userRole, secretPhrase, finalPath, port)
+		log.Printf("init: role=%s config=%s", userRole, finalDir)
+		cfg, priv, err := config.InitConfig(userRole, secretPhrase, finalDir, port)
 		if err != nil {
 			return err
 		}
@@ -48,7 +48,7 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Success! Config created at %s\n", finalPath)
+		fmt.Printf("Success! Config created at %s\n", finalDir)
 		fmt.Printf("Your Peer ID: %s\n", id)
 		fmt.Printf("Local IP set to: %s\n", cfg.LocalIP)
 		fmt.Printf("Rendezvous: %s\n", cfg.Rendezvous)
