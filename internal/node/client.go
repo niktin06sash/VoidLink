@@ -3,7 +3,6 @@ package node
 import (
 	"context"
 	"log"
-	"sync/atomic"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/network"
@@ -34,7 +33,7 @@ func (n *Node) startClient() {
 	}
 }
 func (n *Node) direct() {
-	if atomic.LoadInt32(&n.sets.tunnelActive) == 1 {
+	if n.isTunnelActive() {
 		return
 	}
 	maddr, err := multiaddr.NewMultiaddr(n.sets.serverAddress)
@@ -64,7 +63,7 @@ func (n *Node) direct() {
 	n.startTunnel(s)
 }
 func (n *Node) discover() {
-	if atomic.LoadInt32(&n.sets.tunnelActive) == 1 {
+	if n.isTunnelActive() {
 		return
 	}
 	conns := n.Host.Network().Conns()
@@ -94,7 +93,7 @@ func (n *Node) discover() {
 		log.Printf("client: tunnel ended peer=%s; will continue discovery", p.ID)
 		break
 	}
-	if atomic.LoadInt32(&n.sets.tunnelActive) == 0 {
+	if !n.isTunnelActive() {
 		for _, pid := range n.Host.Network().Peers() {
 			if pid == n.Host.ID() {
 				continue

@@ -3,25 +3,28 @@ package node
 import (
 	"context"
 	"log"
-	"sync/atomic"
 
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/niktin06sash/VoidLink/internal/engine"
 )
 
 func (n *Node) startTunnel(s network.Stream) {
 	remotePeer := s.Conn().RemotePeer()
-	atomic.StoreInt32(&n.sets.tunnelActive, 1)
-	n.sets.peerMu.Lock()
-	n.sets.currentPeer = remotePeer
-	n.sets.peerMu.Unlock()
-	log.Printf("tunnel: start peer=%s", remotePeer)
+	n.sets.tunnelsMu.Lock()
+	if n.sets.activeTunnels == nil {
+		n.sets.activeTunnels = make(map[peer.ID]struct{})
+	}
+	n.sets.activeTunnels[remotePeer] = struct{}{}
+	n.sets.tunnelsMu.Unlock()
+
+	log.Printf("tunnel: start peer=%s active=%d", remotePeer, n.tunnelCount())
 	defer func() {
-		atomic.StoreInt32(&n.sets.tunnelActive, 0)
-		n.sets.peerMu.Lock()
-		n.sets.currentPeer = ""
-		n.sets.peerMu.Unlock()
+		n.sets.tunnelsMu.Lock()
+		delete(n.sets.activeTunnels, remotePeer)
+		n.sets.tunnelsMu.Unlock()
 		s.Close()
+		log.Printf("tunnel: stop peer=%s active=%d", remotePeer, n.tunnelCount())
 	}()
 	streamctx, cancel := context.WithCancel(n.ctx)
 	defer cancel()
@@ -36,11 +39,19 @@ func (n *Node) startTunnel(s network.Stream) {
 	}()
 	select {
 	case <-n.ctx.Done():
-		log.Printf("tunnel: stop (node context done) peer=%s", s.Conn().RemotePeer())
-		return
+		log.Printf("tunnel: stop (node context done) peer=%s", remotePeer)
 	case <-donechan:
-		log.Printf("tunnel: stop (direction ended) peer=%s", s.Conn().RemotePeer())
+		log.Printf("tunnel: stop (direction ended) peer=%s", remotePeer)
 		cancel()
-		return
 	}
+}
+
+func (n *Node) tunnelCount() int {
+	n.sets.tunnelsMu.RLock()
+	defer n.sets.tunnelsMu.RUnlock()
+	return len(n.sets.activeTunnels)
+}
+
+func (n *Node) isTunnelActive() bool {
+	return n.tunnelCount() > 0
 }

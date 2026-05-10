@@ -26,7 +26,7 @@ type StatusResponse struct {
 	PublicAddrs  []string     `json:"public_addrs"`
 	ActivePeers  []PeerDetail `json:"active_peers"`
 	TunnelActive bool         `json:"tunnel_active"`
-	CurrentPeer  Peer         `json:"current_peer"`
+	CurrentPeers []string     `json:"current_peers"`
 }
 
 type Transport string
@@ -35,7 +35,6 @@ type Latency string
 type Peer string
 
 const (
-	NoneActivePeer   Peer      = "none"
 	LatencyUnknown   Latency   = "n/a"
 	AdressUnknown    Address   = "unknown"
 	TransportUnknown Transport = "unknown"
@@ -45,10 +44,11 @@ const (
 )
 
 type PeerDetail struct {
-	ID        string    `json:"id"`
-	Addr      Address   `json:"addr"`
-	Latency   Latency   `json:"latency"`
-	Transport Transport `json:"transport"`
+	ID           string    `json:"id"`
+	Addr         Address   `json:"addr"`
+	Latency      Latency   `json:"latency"`
+	Transport    Transport `json:"transport"`
+	TunnelActive bool      `json:"tunnel_active"`
 }
 
 func (n *Node) statusSocket() error {
@@ -88,15 +88,8 @@ func (n *Node) statusSocket() error {
 }
 
 func (n *Node) newStatusResponse() StatusResponse {
-	n.sets.peerMu.RLock()
-	cp := Peer(n.sets.currentPeer.String())
-	n.sets.peerMu.RUnlock()
-	if cp == "" {
-		cp = NoneActivePeer
-	}
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	alloc := m.Alloc
 	var peerDetails []PeerDetail
 	for _, p := range n.Host.Network().Peers() {
 		latStr := LatencyUnknown
@@ -120,16 +113,19 @@ func (n *Node) newStatusResponse() StatusResponse {
 				transport = TransportUDP
 			}
 		}
+		n.sets.tunnelsMu.RLock()
+		_, tunnelActive := n.sets.activeTunnels[p]
+		n.sets.tunnelsMu.RUnlock()
 		peerDetails = append(peerDetails, PeerDetail{
-			ID:        p.String(),
-			Addr:      remoteAddr,
-			Latency:   latStr,
-			Transport: transport,
+			ID:           p.String(),
+			Addr:         remoteAddr,
+			Latency:      latStr,
+			Transport:    transport,
+			TunnelActive: tunnelActive,
 		})
 	}
 	rx := atomic.LoadUint64(&n.sets.rxBytes)
 	tx := atomic.LoadUint64(&n.sets.txBytes)
-	uptime := time.Since(n.sets.startTime)
 	n.sets.speedMu.Lock()
 	rxSpeed := n.sets.currentRxSpeed
 	txSpeed := n.sets.currentTxSpeed
@@ -140,17 +136,23 @@ func (n *Node) newStatusResponse() StatusResponse {
 			publicAddrs = append(publicAddrs, addr.String())
 		}
 	}
+	n.sets.tunnelsMu.RLock()
+	activePeerIDs := make([]string, 0, len(n.sets.activeTunnels))
+	for pid := range n.sets.activeTunnels {
+		activePeerIDs = append(activePeerIDs, pid.String())
+	}
+	n.sets.tunnelsMu.RUnlock()
 	return StatusResponse{
-		Uptime:       uptime.Truncate(time.Second).String(),
-		MemoryUsage:  alloc,
+		Uptime:       time.Since(n.sets.startTime).Truncate(time.Second).String(),
+		MemoryUsage:  m.Alloc,
 		RxBytes:      rx,
 		TxBytes:      tx,
 		ActivePeers:  peerDetails,
 		RxSpeed:      rxSpeed,
 		TxSpeed:      txSpeed,
 		PublicAddrs:  publicAddrs,
-		TunnelActive: atomic.LoadInt32(&n.sets.tunnelActive) == 1,
-		CurrentPeer:  cp,
+		TunnelActive: n.isTunnelActive(),
+		CurrentPeers: activePeerIDs,
 	}
 }
 func (n *Node) startStatsInformer() {

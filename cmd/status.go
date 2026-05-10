@@ -27,15 +27,16 @@ var statusCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		role := args[0]
-		finalPath := cfgFile
-		if finalPath == "" {
-			finalPath = config.GetConfigPath(role)
+		finalDir := cfgFile
+		if finalDir == "" {
+			finalDir = config.GetConfigDir()
 		}
+		finalPath := config.GetConfigFilePath(finalDir, role)
 		cfg, err := config.LoadConfig(finalPath)
 		if err != nil {
 			return err
 		}
-		priv, err := config.LoadIdentity(cfg.KeyPath, finalPath)
+		priv, err := config.LoadIdentity(cfg.KeyPath)
 		if err != nil {
 			return err
 		}
@@ -43,7 +44,7 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println("\n=== VoidLink Node Status ===")
+		fmt.Println("\n=== VoidLink Status ===")
 		fmt.Printf("Config: %s\n", finalPath)
 		fmt.Printf("Role: %s\n", cfg.Role)
 		fmt.Printf("Peer ID: %s\n", peerID)
@@ -77,24 +78,40 @@ func printStatus(stats node.StatusResponse) {
 	}
 	fmt.Printf("Status:         %s\n", statusStr)
 	fmt.Printf("Uptime:         %s\n", stats.Uptime)
+	fmt.Printf("Memory Usage:   %s\n", formatBytes(stats.MemoryUsage))
 	if len(stats.PublicAddrs) > 0 {
 		fmt.Printf("Public Addr:    %s\n", stats.PublicAddrs[0])
 	}
-	fmt.Printf("Memory Usage:   %s\n", formatBytes(stats.MemoryUsage))
 	fmt.Printf("RX: %-12s | Speed: %s/s\n", formatBytes(stats.RxBytes), formatBytes(uint64(stats.RxSpeed)))
 	fmt.Printf("TX: %-12s | Speed: %s/s\n", formatBytes(stats.TxBytes), formatBytes(uint64(stats.TxSpeed)))
-	fmt.Println("--- Active Peers ---")
+	if len(stats.CurrentPeers) > 0 {
+		fmt.Printf("Active Tunnels: %d\n", len(stats.CurrentPeers))
+		for _, pid := range stats.CurrentPeers {
+			short := pid
+			if len(short) > 20 {
+				short = short[:16] + "..."
+			}
+			fmt.Printf("  tunnel -> %s\n", short)
+		}
+	} else {
+		fmt.Println("Active Tunnels: 0")
+	}
+	fmt.Println("Active Peers")
 	if len(stats.ActivePeers) == 0 {
 		fmt.Println("No active peer connections.")
 	} else {
-		fmt.Printf("%-15s %-22s %-12s %-8s\n", "PEER ID", "REMOTE ADDRESS", "LATENCY", "PROTO")
+		fmt.Printf("%-15s %-30s %-12s %-8s %-8s\n", "PEER ID", "REMOTE ADDRESS", "LATENCY", "PROTO", "TUNNEL")
 		for _, p := range stats.ActivePeers {
 			idShort := p.ID
 			if len(idShort) > 15 {
 				idShort = idShort[:12] + "..."
 			}
-			fmt.Printf("%-15s %-22s %-12s %-8s\n",
-				idShort, p.Addr, p.Latency, p.Transport)
+			tunnelStr := ""
+			if p.TunnelActive {
+				tunnelStr = "✓"
+			}
+			fmt.Printf("%-15s %-30s %-12s %-8s %-8s\n",
+				idShort, p.Addr, p.Latency, p.Transport, tunnelStr)
 		}
 	}
 }

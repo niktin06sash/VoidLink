@@ -18,11 +18,11 @@ run-local: unit-test build
 	chmod +x $(LOCAL_RUN)
 	sudo -E $(LOCAL_RUN)
 
-status:
+status-local:
 	@echo "==> Displaying status..."
 	watch -n 1 "echo '--- SERVER ---' && sudo ./$(BINARY) status server --config $(CFG_S) && echo '\n--- CLIENT ---' && sudo ./$(BINARY) status client --config $(CFG_C)"
 
-logs:
+logs-local:
 	@echo "==> Following logs..."
 	tail -f $(LOG_S) $(LOG_C)
 
@@ -57,3 +57,12 @@ unit-test:
 test-cover:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out
+
+run-connect-direct-all:
+	sudo ./vlink up client --server-address $(SERVER_ADDRESS) --route-all
+
+run-connect-direct-split:
+	sudo ./vlink up client --server-address $(SERVER_ADDRESS) --route-split
+
+status-connect:
+	watch -n 1 "sudo ./vlink status client"

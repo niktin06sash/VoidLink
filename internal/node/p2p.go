@@ -40,9 +40,8 @@ type Node struct {
 }
 type nodeSettings struct {
 	path           string
-	tunnelActive   int32
-	currentPeer    peer.ID
-	peerMu         sync.RWMutex
+	activeTunnels  map[peer.ID]struct{}
+	tunnelsMu      sync.RWMutex
 	startTime      time.Time
 	rxBytes        uint64
 	txBytes        uint64
@@ -53,9 +52,10 @@ type nodeSettings struct {
 	currentRxSpeed float64
 	currentTxSpeed float64
 	speedMu        sync.Mutex
+	routeSplited   bool
 }
 
-func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey crypto.PrivKey, path string, serveradr string) (*Node, error) {
+func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey crypto.PrivKey, path string, serveradr string, routesplit bool) (*Node, error) {
 	wgh := whitelist.NewWhitelistManager(cfg.Whitelist)
 	host, err := libp2p.New(
 		libp2p.ConnectionGater(gater.NewSecurityGater(wgh)),
@@ -80,7 +80,7 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 		return nil, fmt.Errorf("failed to start mDNS: %w", err)
 	}
 	log.Printf("node: mdns started service=%s", implmDNS.MDNSName)
-	sets := &nodeSettings{path: path, startTime: time.Now(), serverAddress: serveradr}
+	sets := &nodeSettings{path: path, startTime: time.Now(), serverAddress: serveradr, routeSplited: routesplit}
 	prefix := cid.Prefix{
 		Version:  1,
 		Codec:    cid.Raw,
