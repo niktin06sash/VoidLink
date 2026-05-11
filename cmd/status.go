@@ -56,7 +56,7 @@ var statusCmd = &cobra.Command{
 		socketPath := config.GetSocketPath(finalPath)
 		conn, err := net.Dial("unix", socketPath)
 		if err != nil {
-			log.Printf("socket: error while connect: %v", err)
+			log.Printf("status: error while connect: %v", err)
 			return nil
 		}
 		defer conn.Close()

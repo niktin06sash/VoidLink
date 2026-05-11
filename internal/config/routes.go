@@ -47,7 +47,7 @@ func ReadRoutes(path string) ([]string, error) {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to read default routes file: %w", err)
+		return nil, fmt.Errorf("config: failed to read default routes file: %w", err)
 	}
 	var routes []string
 	for line := range strings.SplitSeq(string(data), "\n") {
@@ -63,7 +63,7 @@ func writeDefaultRoutes(path string) error {
 	content := strings.Join(defaultRoutes, "\n") + "\n"
 	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write default routes: %w", err)
+		return fmt.Errorf("config: failed to write default routes: %w", err)
 	}
 	return nil
 }

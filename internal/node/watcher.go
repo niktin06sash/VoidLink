@@ -18,17 +18,17 @@ func (n *Node) watchSignal() {
 			case <-n.ctx.Done():
 				return
 			case <-sigs:
-				log.Printf("config: received SIGHUP, reloading whitelist path=%s", n.sets.path)
+				log.Printf("watcher: received SIGHUP, reloading whitelist path=%s", n.sets.path)
 				newCfg, err := config.LoadConfig(n.sets.path)
 				if err != nil {
-					log.Printf("config: reload failed err=%v", err)
+					log.Printf("watcher: reload failed err=%v", err)
 					continue
 				}
 				n.wm.Update(newCfg.Whitelist)
-				log.Printf("config: whitelist reloaded entries=%d", len(newCfg.Whitelist))
+				log.Printf("watcher: whitelist reloaded entries=%d", len(newCfg.Whitelist))
 				if n.sets.routeSplited {
 					if err := n.Tun.ReloadSplitedRoutes(); err != nil {
-						log.Printf("config: routes reload failed err=%v", err)
+						log.Printf("watcher: routes reload failed err=%v", err)
 					}
 				}
 			}

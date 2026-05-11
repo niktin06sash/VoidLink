@@ -48,15 +48,15 @@ func getHomeDir() string {
 func createIdentity(targetPath string) (crypto.PrivKey, error) {
 	priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
 	if err != nil {
-		return nil, fmt.Errorf("key generation error: %w", err)
+		return nil, fmt.Errorf("config: key generation error: %w", err)
 	}
 	data, err := crypto.MarshalPrivateKey(priv)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal private key: %w", err)
+		return nil, fmt.Errorf("config: failed to marshal private key: %w", err)
 	}
 	err = os.WriteFile(targetPath, data, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to write file: %w", err)
+		return nil, fmt.Errorf("config: failed to write file: %w", err)
 	}
 	return priv, nil
 }

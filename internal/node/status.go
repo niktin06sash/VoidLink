@@ -54,11 +54,11 @@ type PeerDetail struct {
 func (n *Node) statusSocket() error {
 	socketpath := config.GetSocketPath(n.sets.path)
 	if err := os.Remove(socketpath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("socket: failed to remove old socket: %w", err)
+		return fmt.Errorf("status: failed to remove old socket: %w", err)
 	}
 	l, err := net.Listen("unix", socketpath)
 	if err != nil {
-		return fmt.Errorf("socket: error while starts socket: %v", err)
+		return fmt.Errorf("status: error while starts socket: %v", err)
 	}
 	n.startStatsInformer()
 	go func() {
@@ -72,14 +72,14 @@ func (n *Node) statusSocket() error {
 			}
 			conn, err := l.Accept()
 			if err != nil {
-				log.Printf("socket: error while accepted connection: %v", err)
+				log.Printf("status: error while accepted connection: %v", err)
 				continue
 			}
 			go func(c net.Conn) {
 				defer c.Close()
 				resp := n.newStatusResponse()
 				if err := json.NewEncoder(c).Encode(resp); err != nil {
-					log.Printf("socket: encode error: %v", err)
+					log.Printf("status: encode error: %v", err)
 				}
 			}(conn)
 		}

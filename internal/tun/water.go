@@ -30,7 +30,7 @@ func NewTun(cfg *config.Config) (*Tun, error) {
 	waterconf.Name = cfg.InterfaceName
 	iface, err := water.New(waterconf)
 	if err != nil {
-		return nil, fmt.Errorf("error while created TUN-interface: %w", err)
+		return nil, fmt.Errorf("tun: error while created TUN-interface: %w", err)
 	}
 	log.Printf("tun: created interface name=%s", cfg.InterfaceName)
 	t := &Tun{
@@ -44,7 +44,7 @@ func NewTun(cfg *config.Config) (*Tun, error) {
 }
 func (t *Tun) applySettings(cfg *config.Config) error {
 	if runtime.GOOS != "linux" {
-		return fmt.Errorf("OS %s is not supported yet", runtime.GOOS)
+		return fmt.Errorf("tun: OS %s is not supported yet", runtime.GOOS)
 	}
 	commands := [][]string{
 		{"ip", "addr", "add", cfg.LocalIP + "/24", "dev", cfg.InterfaceName},
@@ -57,7 +57,7 @@ func (t *Tun) applySettings(cfg *config.Config) error {
 		log.Printf("tun: exec %s", strings.Join(args, " "))
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("command failed %v: %w (output=%s)", args, err, strings.TrimSpace(string(out)))
+			return fmt.Errorf("tun: command failed %v: %w (output=%s)", args, err, strings.TrimSpace(string(out)))
 		}
 	}
 	log.Printf("tun: configured ip=%s dev=%s mtu=%d", cfg.LocalIP, cfg.InterfaceName, MTU)
@@ -72,11 +72,11 @@ func (t *Tun) setDNS(dns string) error {
 	log.Printf("tun: setting DNS to %s for interface %s", dns, t.Iface.Name())
 	err := exec.Command("resolvectl", "dns", t.Iface.Name(), dns).Run()
 	if err != nil {
-		return fmt.Errorf("resolvectl dns: %w", err)
+		return fmt.Errorf("tun: resolvectl dns: %w", err)
 	}
 	err = exec.Command("resolvectl", "domain", t.Iface.Name(), "~.").Run()
 	if err != nil {
-		return fmt.Errorf("resolvectl domain: %w", err)
+		return fmt.Errorf("tun: resolvectl domain: %w", err)
 	}
 	log.Printf("tun: DNS set to %s", dns)
 	return nil

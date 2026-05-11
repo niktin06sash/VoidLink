@@ -30,18 +30,19 @@ var addRouteCmd = &cobra.Command{
 			return err
 		}
 		if slices.Contains(routes, cidr) {
-			return fmt.Errorf("route %s already exists", cidr)
+			return fmt.Errorf("route: route %s already exists", cidr)
 		}
 		f, err := os.OpenFile(routesPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return fmt.Errorf("failed to open routes file: %w", err)
+			return fmt.Errorf("route: failed to open routes file: %w", err)
 		}
 		defer f.Close()
 		_, err = fmt.Fprintln(f, cidr)
 		if err != nil {
-			return fmt.Errorf("failed to write route: %w", err)
+			return fmt.Errorf("route: failed to write route: %w", err)
 		}
 		fmt.Printf("Successfully added route %s\n", cidr)
+		reloadRunningVlink()
 		return nil
 	},
 }
@@ -71,13 +72,14 @@ var removeRouteCmd = &cobra.Command{
 			newRoutes = append(newRoutes, r)
 		}
 		if !found {
-			return fmt.Errorf("route %s not found", cidr)
+			return fmt.Errorf("route: route %s not found", cidr)
 		}
 		content := strings.Join(newRoutes, "\n") + "\n"
 		if err := os.WriteFile(routesPath, []byte(content), 0644); err != nil {
-			return fmt.Errorf("failed to write routes file: %w", err)
+			return fmt.Errorf("route: failed to write routes file: %w", err)
 		}
 		fmt.Printf("Successfully removed route %s\n", cidr)
+		reloadRunningVlink()
 		return nil
 	},
 }

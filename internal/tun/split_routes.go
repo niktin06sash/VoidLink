@@ -18,11 +18,11 @@ func (t *Tun) AddSplitRoutes(ctx context.Context, routePath string) error {
 	log.Printf("tun: downloading split IP list...")
 	req, err := http.NewRequestWithContext(ctx, "GET", splitListURL, nil)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return fmt.Errorf("tun: create request: %w", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("download split list: %w", err)
+		return fmt.Errorf("tun: download split list: %w", err)
 	}
 	defer resp.Body.Close()
 	var antifilter []string
@@ -35,11 +35,11 @@ func (t *Tun) AddSplitRoutes(ctx context.Context, routePath string) error {
 		antifilter = append(antifilter, line)
 	}
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scan list error: %w", err)
+		return fmt.Errorf("tun: scan list error: %w", err)
 	}
 	defRoutes, err := config.ReadRoutes(routePath)
 	if err != nil {
-		log.Printf("tun: failed to read default routes: %v", err)
+		log.Println(err)
 	}
 	log.Printf("tun: adding %d antifilter + %d default routes...", len(antifilter), len(defRoutes))
 	var addedAntifilter int
@@ -48,6 +48,8 @@ func (t *Tun) AddSplitRoutes(ctx context.Context, routePath string) error {
 		if cmd.Run() == nil {
 			t.antifilterRoutes = append(t.antifilterRoutes, route)
 			addedAntifilter++
+		} else {
+			log.Printf("tun: failed to add antifilter route %s: %v", route, err)
 		}
 	}
 	var addedDefault int
@@ -56,11 +58,13 @@ func (t *Tun) AddSplitRoutes(ctx context.Context, routePath string) error {
 		if cmd.Run() == nil {
 			t.defaultRoutes = append(t.defaultRoutes, route)
 			addedDefault++
+		} else {
+			log.Printf("tun: failed to add default route %s: %v", route, err)
 		}
 	}
 	t.routePath = routePath
 	if err := t.setDNS("8.8.8.8"); err != nil {
-		log.Printf("tun: failed to set DNS: %v", err)
+		return err
 	}
 	log.Printf("tun: split routes added antifilter=%d/%d default=%d/%d",
 		addedAntifilter, len(antifilter), addedDefault, len(defRoutes))
@@ -92,7 +96,7 @@ func (t *Tun) RemoveSplitedRoutes() {
 func (t *Tun) ReloadSplitedRoutes() error {
 	newRoutes, err := config.ReadRoutes(t.routePath)
 	if err != nil {
-		return fmt.Errorf("reload routes: %w", err)
+		return err
 	}
 	oldSet := make(map[string]struct{}, len(t.defaultRoutes))
 	for _, r := range t.defaultRoutes {
@@ -104,7 +108,10 @@ func (t *Tun) ReloadSplitedRoutes() error {
 	}
 	for _, r := range t.defaultRoutes {
 		if _, ok := newSet[r]; !ok {
-			exec.Command("ip", "route", "del", r, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+			err := exec.Command("ip", "route", "del", r, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+			if err != nil {
+				log.Printf("tun: failed to remove old route %s: %v", r, err)
+			}
 		}
 	}
 	var result []string
@@ -113,6 +120,8 @@ func (t *Tun) ReloadSplitedRoutes() error {
 			cmd := exec.Command("ip", "route", "add", r, "via", serverLocalIP, "dev", t.Iface.Name())
 			if cmd.Run() == nil {
 				result = append(result, r)
+			} else {
+				log.Printf("tun: failed to add new route %s: %v", r, err)
 			}
 		} else {
 			result = append(result, r)

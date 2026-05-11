@@ -31,7 +31,7 @@ var initCmd = &cobra.Command{
 		if secretPhrase == "" {
 			s, err := generateRandomString(12)
 			if err != nil {
-				return fmt.Errorf("failed to generate rendezvous secret: %w", err)
+				return fmt.Errorf("init: failed to generate rendezvous secret: %w", err)
 			}
 			secretPhrase = "vlink-" + s
 		}

@@ -14,7 +14,7 @@ func (t *Tun) AddAllRoutes(serveraddr string) error {
 	}
 	gateway, gwIface, err := getDefaultGateway()
 	if err != nil {
-		return fmt.Errorf("get gateway: %w", err)
+		return err
 	}
 	t.gateway = gateway
 	t.gwIface = gwIface
@@ -28,11 +28,11 @@ func (t *Tun) AddAllRoutes(serveraddr string) error {
 		log.Printf("tun: exec %s", strings.Join(args, " "))
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("command failed %v: %w (output=%s)", args, err, strings.TrimSpace(string(out)))
+			return fmt.Errorf("tun: command failed %v: %w (output=%s)", args, err, strings.TrimSpace(string(out)))
 		}
 	}
 	if err := t.setDNS("8.8.8.8"); err != nil {
-		log.Printf("tun: failed to set DNS: %v", err)
+		return err
 	}
 	log.Printf("tun: added routes to server %s via gateway %s dev %s", serverIP, gateway, gwIface)
 	return nil
@@ -60,12 +60,12 @@ func extractIP(addr string) (string, error) {
 			return parts[i+1], nil
 		}
 	}
-	return "", fmt.Errorf("no ip4 in address: %s", addr)
+	return "", fmt.Errorf("tun: no ip4 in address: %s", addr)
 }
 func getDefaultGateway() (gateway, iface string, err error) {
 	out, err := exec.Command("ip", "route", "show", "default").Output()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get default gateway: %w", err)
+		return "", "", fmt.Errorf("tun: failed to get default gateway: %w", err)
 	}
 	fields := strings.Fields(string(out))
 	for i, f := range fields {
@@ -77,7 +77,7 @@ func getDefaultGateway() (gateway, iface string, err error) {
 		}
 	}
 	if gateway == "" || iface == "" {
-		return "", "", fmt.Errorf("could not parse default gateway")
+		return "", "", fmt.Errorf("tun: could not parse default gateway")
 	}
 	return gateway, iface, nil
 }

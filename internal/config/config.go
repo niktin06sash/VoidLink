@@ -39,7 +39,7 @@ func InitConfig(role string, secret string, dir string, port int) (*Config, cryp
 	path := GetConfigFilePath(dir, role)
 	keyPath := GetKeyPath(dir, role)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, nil, fmt.Errorf("failed to create config dir: %w", err)
+		return nil, nil, fmt.Errorf("config: failed to create config dir: %w", err)
 	}
 	var cfg *Config
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -84,7 +84,7 @@ func InitConfig(role string, secret string, dir string, port int) (*Config, cryp
 	routesPath := GetRoutesFilePath(dir)
 	if _, err := os.Stat(routesPath); os.IsNotExist(err) {
 		if err := writeDefaultRoutes(routesPath); err != nil {
-			return nil, nil, fmt.Errorf("failed to create default routes: %v", err)
+			return nil, nil, err
 		}
 	}
 	return cfg, priv, nil
@@ -105,29 +105,29 @@ func LoadConfig(path string) (*Config, error) {
 func GetPeerID(priv crypto.PrivKey) (string, error) {
 	id, err := peer.IDFromPrivateKey(priv)
 	if err != nil {
-		return "", fmt.Errorf("failed to get peer id from private key: %w", err)
+		return "", fmt.Errorf("config: failed to get peer id from private key: %w", err)
 	}
 	return id.String(), nil
 }
 func LoadIdentity(keypath string) (crypto.PrivKey, error) {
 	data, err := os.ReadFile(keypath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read key: %w", err)
+		return nil, fmt.Errorf("config: failed to read key: %w", err)
 	}
 	key, err := crypto.UnmarshalPrivateKey(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
+		return nil, fmt.Errorf("config: failed to unmarshal private key: %w", err)
 	}
 	return key, nil
 }
 func SaveConfig(configPath string, cfg Config) error {
 	yamlData, err := yaml.Marshal(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
+		return fmt.Errorf("config: failed to marshal config: %w", err)
 	}
 	err = os.WriteFile(configPath, yamlData, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
+		return fmt.Errorf("config: failed to write file: %w", err)
 	}
 	return nil
 }

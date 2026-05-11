@@ -61,7 +61,7 @@ var addPeerCmd = &cobra.Command{
 			cfg.Whitelist = make(map[string]config.PeerInfo)
 		}
 		if _, ok := cfg.Whitelist[newID]; ok {
-			return fmt.Errorf("peer %s already exists in whitelist", newID)
+			return fmt.Errorf("peer: peer %s already exists in whitelist", newID)
 		}
 		cfg.Whitelist[newID] = config.PeerInfo{
 			Name:    peerName,
@@ -129,7 +129,7 @@ var removePeerCmd = &cobra.Command{
 			return err
 		}
 		if _, ok := cfg.Whitelist[peerID]; !ok {
-			return fmt.Errorf("peer %s not found in whitelist", peerID)
+			return fmt.Errorf("peer: peer %s not found in whitelist", peerID)
 		}
 		delete(cfg.Whitelist, peerID)
 		if err := config.SaveConfig(finalPath, *cfg); err != nil {
@@ -143,7 +143,7 @@ var removePeerCmd = &cobra.Command{
 func reloadRunningVlink() {
 	out, err := exec.Command("pgrep", "-x", "vlink").Output()
 	if err != nil {
-		log.Printf("peer: whitelist updated (no reload); pgrep failed err=%v", err)
+		log.Printf("reload: pgrep failed err=%v", err)
 		return
 	}
 	self := os.Getpid()
@@ -157,12 +157,12 @@ func reloadRunningVlink() {
 			continue
 		}
 		if err := syscall.Kill(pid, syscall.SIGHUP); err != nil {
-			log.Printf("peer: failed to send SIGHUP pid=%d err=%v", pid, err)
+			log.Printf("reload: failed to send SIGHUP pid=%d err=%v", pid, err)
 			continue
 		}
 		signaled++
 	}
 	if signaled > 0 {
-		fmt.Printf("Sent SIGHUP to %d running vlink process(es) to reload whitelist.\n", signaled)
+		fmt.Printf("Sent SIGHUP to %d running vlink process(es) to reload.\n", signaled)
 	}
 }
