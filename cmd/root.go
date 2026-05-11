@@ -36,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(peerCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(upCmd)
+	rootCmd.AddCommand(downCmd)
 	peerCmd.AddCommand(addPeerCmd)
 	peerCmd.AddCommand(listPeersCmd)
 	peerCmd.AddCommand(removePeerCmd)

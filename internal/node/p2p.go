@@ -16,6 +16,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
@@ -27,16 +28,17 @@ import (
 )
 
 type Node struct {
-	Host       host.Host
-	DHT        *dht.IpfsDHT
-	Tun        *tun.Tun
-	wm         *whitelist.WhitelistManager
-	rendezvous string
-	role       config.Role
-	mdns       mdns.Service
-	ctx        context.Context
-	sets       *nodeSettings
-	key        cid.Cid
+	Host        host.Host
+	DHT         *dht.IpfsDHT
+	Tun         *tun.Tun
+	wm          *whitelist.WhitelistManager
+	rendezvous  string
+	role        config.Role
+	mdns        mdns.Service
+	ctx         context.Context
+	sets        *nodeSettings
+	key         cid.Cid
+	pingService *ping.PingService
 }
 type nodeSettings struct {
 	path           string
@@ -67,7 +69,7 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 		libp2p.EnableHolePunching(),
 		libp2p.EnableRelay())
 	if err != nil {
-		return nil, fmt.Errorf("error while create node: %w", err)
+		return nil, fmt.Errorf("node: error while creating node: %w", err)
 	}
 	log.Printf("node: created host peer_id=%s", host.ID())
 	for _, a := range host.Addrs() {
@@ -77,7 +79,7 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 	ser := mdns.NewMdnsService(host, implmDNS.MDNSName, locmdns)
 	err = ser.Start()
 	if err != nil {
-		return nil, fmt.Errorf("failed to start mDNS: %w", err)
+		return nil, fmt.Errorf("node: failed to start mDNS: %w", err)
 	}
 	log.Printf("node: mdns started service=%s", implmDNS.MDNSName)
 	sets := &nodeSettings{path: path, startTime: time.Now(), serverAddress: serveradr, routeSplited: routesplit}
@@ -89,19 +91,20 @@ func NewNode(ctx context.Context, cfg *config.Config, tun *tun.Tun, privkey cryp
 	}
 	key, err := prefix.Sum([]byte(cfg.Rendezvous))
 	if err != nil {
-		log.Printf("node: cid generation error: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("node: cid generation error: %w", err)
 	}
+	pingService := ping.NewPingService(host)
 	return &Node{
-		Host:       host,
-		Tun:        tun,
-		rendezvous: cfg.Rendezvous,
-		wm:         wgh,
-		role:       cfg.Role,
-		mdns:       ser,
-		ctx:        ctx,
-		sets:       sets,
-		key:        key,
+		Host:        host,
+		Tun:         tun,
+		rendezvous:  cfg.Rendezvous,
+		wm:          wgh,
+		role:        cfg.Role,
+		mdns:        ser,
+		ctx:         ctx,
+		sets:        sets,
+		key:         key,
+		pingService: pingService,
 	}, nil
 }
 
