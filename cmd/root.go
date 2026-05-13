@@ -30,6 +30,7 @@ var serverAddress string
 var port int
 var routeAll bool
 var routeSplit bool
+var forceDown bool
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
@@ -44,6 +45,8 @@ func init() {
 	routeCmd.AddCommand(addRouteCmd)
 	routeCmd.AddCommand(removeRouteCmd)
 	routeCmd.AddCommand(listRoutesCmd)
+	downCmd.Flags().StringVar(&serverAddress, "server-address", "", "flag to direct connect to server")
+	downCmd.Flags().BoolVar(&forceDown, "force", false, "force cleanup routes and interface without stopping process")
 	upCmd.Flags().BoolVar(&routeSplit, "route-split", false, "route split resources through VoidLink")
 	upCmd.Flags().BoolVar(&routeAll, "route-all", false, "route all traffic through VoidLink")
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "path to config directory (default is $HOME/.voidlink)")

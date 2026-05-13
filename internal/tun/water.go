@@ -65,6 +65,10 @@ func (t *Tun) applySettings(cfg *config.Config) error {
 }
 
 func (t *Tun) Close() error {
+	err := exec.Command("ip", "link", "delete", t.Iface.Name()).Run()
+	if err != nil {
+		log.Printf("tun: failed to delete interface %s: %v", t.Iface.Name(), err)
+	}
 	return t.Iface.Close()
 }
 

@@ -32,8 +32,8 @@ type Config struct {
 
 const serverLocalIP = "10.1.1.1"
 const clientLocalIP = "10.1.1.2"
-const clientInterface = "void1"
-const serverInterface = "void0"
+const ClientInterface = "void1"
+const ServerInterface = "void0"
 
 func InitConfig(role string, secret string, dir string, port int) (*Config, crypto.PrivKey, error) {
 	path := GetConfigFilePath(dir, role)
@@ -47,9 +47,9 @@ func InitConfig(role string, secret string, dir string, port int) (*Config, cryp
 		if Role(role) == Server {
 			localIP = serverLocalIP
 		}
-		ifaceName := clientInterface
+		ifaceName := ClientInterface
 		if Role(role) == Server {
-			ifaceName = serverInterface
+			ifaceName = ServerInterface
 		}
 		cfg = &Config{
 			ListenPort:    port,

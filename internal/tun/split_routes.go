@@ -44,8 +44,8 @@ func (t *Tun) AddSplitRoutes(ctx context.Context, routePath string) error {
 	log.Printf("tun: adding %d antifilter + %d default routes...", len(antifilter), len(defRoutes))
 	var addedAntifilter int
 	for _, route := range antifilter {
-		cmd := exec.Command("ip", "route", "add", route, "via", serverLocalIP, "dev", t.Iface.Name())
-		if cmd.Run() == nil {
+		err := exec.Command("ip", "route", "add", route, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+		if err == nil {
 			t.antifilterRoutes = append(t.antifilterRoutes, route)
 			addedAntifilter++
 		} else {
@@ -54,8 +54,8 @@ func (t *Tun) AddSplitRoutes(ctx context.Context, routePath string) error {
 	}
 	var addedDefault int
 	for _, route := range defRoutes {
-		cmd := exec.Command("ip", "route", "add", route, "via", serverLocalIP, "dev", t.Iface.Name())
-		if cmd.Run() == nil {
+		err := exec.Command("ip", "route", "add", route, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+		if err == nil {
 			t.defaultRoutes = append(t.defaultRoutes, route)
 			addedDefault++
 		} else {
@@ -117,8 +117,8 @@ func (t *Tun) ReloadSplitedRoutes() error {
 	var result []string
 	for _, r := range newRoutes {
 		if _, ok := oldSet[r]; !ok {
-			cmd := exec.Command("ip", "route", "add", r, "via", serverLocalIP, "dev", t.Iface.Name())
-			if cmd.Run() == nil {
+			err := exec.Command("ip", "route", "add", r, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+			if err == nil {
 				result = append(result, r)
 			} else {
 				log.Printf("tun: failed to add new route %s: %v", r, err)

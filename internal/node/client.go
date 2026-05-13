@@ -61,6 +61,7 @@ func (n *Node) direct() {
 	}
 	log.Printf("client: direct tunnel established peer=%s", pi.ID)
 	n.startTunnel(s)
+	log.Printf("client: tunnel ended peer=%s; will continue discovery", pi.ID)
 }
 func (n *Node) discover() {
 	if n.isTunnelActive() {
@@ -73,11 +74,11 @@ func (n *Node) discover() {
 	defer cancel()
 	provChan := n.DHT.FindProvidersAsync(ctx, n.key, 1)
 	for p := range provChan {
+		//provider is currently unavailable -> add configuring interface according to the server address in tun
 		log.Printf("client: found provider: id=%s addrs=%d allowed=%v", p.ID, len(p.Addrs), n.wm.IsAllowed(p.ID))
 		if p.ID == n.Host.ID() || len(p.Addrs) == 0 {
 			continue
 		}
-		log.Println(p.ID)
 		if !n.wm.IsAllowed(p.ID) {
 			continue
 		}

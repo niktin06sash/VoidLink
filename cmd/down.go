@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/niktin06sash/VoidLink/internal/config"
+	"github.com/niktin06sash/VoidLink/internal/tun"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +30,9 @@ var downCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		role := args[0]
+		if forceDown {
+			return forceCleanup(role, serverAddress)
+		}
 		out, err := exec.Command("pgrep", "-f", "vlink up "+role).Output()
 		if err != nil {
 			return fmt.Errorf("down: no running vlink %s process found", role)
@@ -55,4 +59,17 @@ var downCmd = &cobra.Command{
 		fmt.Printf("Stopped %d vlink %s process(es)\n", stopped, role)
 		return nil
 	},
+}
+
+func forceCleanup(role string, serveraddress string) error {
+	iface := config.ClientInterface
+	if config.Role(role) == config.Server {
+		iface = config.ServerInterface
+	}
+	log.Printf("down: force cleanup interface=%s", iface)
+	err := tun.ForceCleanup(iface, serveraddress)
+	if err != nil {
+		return err
+	}
+	return nil
 }

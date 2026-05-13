@@ -66,3 +66,9 @@ run-connect-direct-split:
 
 status-connect:
 	watch -n 1 "sudo ./vlink status client"
+
+stop-connect:
+	sudo ./vlink down client
+
+stop-force-connect:
+	sudo ./vlink down client --server-address $(SERVER_ADDRESS) --force
