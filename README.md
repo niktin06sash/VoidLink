@@ -1,7 +1,6 @@
 # VoidLink
 
 VoidLink is a Linux CLI tunnel tool that creates a secure point-to-point IP tunnel over libp2p.
-It is intended for small private use cases where a client and server need a direct encrypted tunnel with optional routing control.
 
 ## What VoidLink solves
 
@@ -58,8 +57,8 @@ go build -o vlink ./cmd/vlink
 1. Initialize server and client config:
 
 ```bash
-./vlink init server --port 12345
-./vlink init client
+./vlink init server --port 12345 --secret my-voidlink
+./vlink init client --secret my-voidlink
 ```
 
 2. Start server:
@@ -68,7 +67,7 @@ go build -o vlink ./cmd/vlink
 sudo ./vlink up server
 ```
 
-3. Start client using server address:
+3. Start client using server address (server's whitelist must store client's peerId):
 
 ```bash
 sudo ./vlink up client --server-address /ip4/1.2.3.4/tcp/12345/p2p/<peer-id>
@@ -81,7 +80,7 @@ sudo ./vlink status client
 sudo ./vlink status server
 ```
 
-5. Stop the tunnel:
+5. Stop tunnel:
 
 ```bash
 sudo ./vlink down client
@@ -248,6 +247,10 @@ DNS is automatically restored when the tunnel is stopped with `sudo ./vlink down
 - The TUN interface names are fixed to `void0` (server) and `void1` (client).
 - `route-split` adds routes directly to the Linux routing table and depends on external split-list sources.
 - The tool is designed for small peer-to-peer setups.
+- **DHT discovery may be unreliable in some regions.** Public IPFS bootstrap nodes 
+  (port 4001/TCP and UDP) are inaccessible or unstable in certain networks, causing 
+  the routing table to stay empty and `AsyncFindProviders` to return no results. 
+  Use `--server-address` for direct connection as a reliable alternative.
 
 ## Useful Makefile commands
 
