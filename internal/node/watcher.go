@@ -24,7 +24,7 @@ func (n *Node) watchSignal() {
 					log.Printf("watcher: reload failed err=%v", err)
 					continue
 				}
-				n.wm.Update(newCfg.Whitelist)
+				n.updateWhitelist(newCfg.Whitelist)
 				log.Printf("watcher: whitelist reloaded entries=%d", len(newCfg.Whitelist))
 				if n.sets.routeSplited {
 					if err := n.Tun.ReloadSplitedRoutes(); err != nil {
@@ -34,4 +34,15 @@ func (n *Node) watchSignal() {
 			}
 		}
 	}()
+}
+
+func (n *Node) updateWhitelist(newWhitelist map[string]config.PeerInfo) {
+	removedPeers := n.wm.Update(newWhitelist)
+	for _, peerID := range removedPeers {
+		if err := n.Host.Network().ClosePeer(peerID); err != nil {
+			log.Printf("watcher: failed to disconnect removed peer=%s err=%v", peerID, err)
+			continue
+		}
+		log.Printf("watcher: disconnected removed peer=%s", peerID)
+	}
 }

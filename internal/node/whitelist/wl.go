@@ -23,8 +23,20 @@ func (m *WhitelistManager) IsAllowed(p peer.ID) bool {
 	return ok
 }
 
-func (m *WhitelistManager) Update(newData map[string]config.PeerInfo) {
+func (m *WhitelistManager) Update(newData map[string]config.PeerInfo) []peer.ID {
 	m.Lock()
 	defer m.Unlock()
+
+	removed := make([]peer.ID, 0)
+	for rawID := range m.data {
+		if _, ok := newData[rawID]; ok {
+			continue
+		}
+		peerID, err := peer.Decode(rawID)
+		if err == nil {
+			removed = append(removed, peerID)
+		}
+	}
 	m.data = newData
+	return removed
 }

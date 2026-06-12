@@ -36,10 +36,7 @@ func (n *Node) Run() error {
 	} else {
 		log.Printf("run: direct mode, skipping DHT and bootstrap")
 	}
-	n.Host.SetStreamHandler(protocol.ID(ProtocolID), func(s network.Stream) {
-		log.Printf("run: inbound opened peer=%s", s.Conn().RemotePeer())
-		go n.startTunnel(s)
-	})
+	n.Host.SetStreamHandler(protocol.ID(ProtocolID), n.handleTunnelStream)
 	n.statusSocket()
 	n.watchSignal()
 	if n.role == config.Server {
@@ -50,4 +47,17 @@ func (n *Node) Run() error {
 		n.startClient()
 	}
 	return nil
+}
+
+func (n *Node) handleTunnelStream(s network.Stream) {
+	remotePeer := s.Conn().RemotePeer()
+	if !n.wm.IsAllowed(remotePeer) {
+		log.Printf("run: inbound rejected peer=%s reason=not_whitelisted", remotePeer)
+		if err := s.Reset(); err != nil {
+			log.Printf("run: inbound reset failed peer=%s err=%v", remotePeer, err)
+		}
+		return
+	}
+	log.Printf("run: inbound opened peer=%s", remotePeer)
+	go n.startTunnel(s)
 }

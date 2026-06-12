@@ -33,13 +33,16 @@ func TestWhitelistManager(t *testing.T) {
 		newData := map[string]config.PeerInfo{
 			p2.String(): {},
 		}
-		wm.Update(newData)
+		removed := wm.Update(newData)
 
 		if wm.IsAllowed(p1) {
 			t.Error("Old peer p1 should now be blocked")
 		}
 		if !wm.IsAllowed(p2) {
 			t.Error("New peer p2 should now be allowed")
+		}
+		if len(removed) != 1 || removed[0] != p1 {
+			t.Fatalf("Expected removed peer %s, got %v", p1, removed)
 		}
 	})
 }

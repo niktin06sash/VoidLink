@@ -14,18 +14,17 @@ import (
 
 func (n *Node) startTunnel(s network.Stream) {
 	remotePeer := s.Conn().RemotePeer()
-	n.sets.tunnelsMu.Lock()
-	if n.sets.activeTunnels == nil {
-		n.sets.activeTunnels = make(map[peer.ID]struct{})
+	if !n.acquireTunnel(remotePeer) {
+		log.Printf("tunnel: rejected peer=%s reason=tunnel_already_active", remotePeer)
+		if err := s.Reset(); err != nil {
+			log.Printf("tunnel: reset rejected stream peer=%s err=%v", remotePeer, err)
+		}
+		return
 	}
-	n.sets.activeTunnels[remotePeer] = struct{}{}
-	n.sets.tunnelsMu.Unlock()
 
 	log.Printf("tunnel: start peer=%s active=%d", remotePeer, n.tunnelCount())
 	defer func() {
-		n.sets.tunnelsMu.Lock()
-		delete(n.sets.activeTunnels, remotePeer)
-		n.sets.tunnelsMu.Unlock()
+		n.releaseTunnel(remotePeer)
 		s.Close()
 		log.Printf("tunnel: stop peer=%s active=%d", remotePeer, n.tunnelCount())
 	}()
@@ -68,6 +67,26 @@ func (n *Node) startTunnel(s network.Stream) {
 		log.Printf("tunnel: stop (direction ended) peer=%s", remotePeer)
 		cancel()
 	}
+}
+
+func (n *Node) acquireTunnel(remotePeer peer.ID) bool {
+	n.sets.tunnelsMu.Lock()
+	defer n.sets.tunnelsMu.Unlock()
+
+	if len(n.sets.activeTunnels) != 0 {
+		return false
+	}
+	if n.sets.activeTunnels == nil {
+		n.sets.activeTunnels = make(map[peer.ID]struct{}, 1)
+	}
+	n.sets.activeTunnels[remotePeer] = struct{}{}
+	return true
+}
+
+func (n *Node) releaseTunnel(remotePeer peer.ID) {
+	n.sets.tunnelsMu.Lock()
+	defer n.sets.tunnelsMu.Unlock()
+	delete(n.sets.activeTunnels, remotePeer)
 }
 
 func (n *Node) tunnelCount() int {
