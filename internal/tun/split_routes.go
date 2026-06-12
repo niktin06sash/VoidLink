@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os/exec"
 	"strings"
 
 	"github.com/niktin06sash/VoidLink/internal/config"
@@ -41,51 +40,55 @@ func (t *Tun) AddSplitRoutes(ctx context.Context, routePath string) error {
 	if err != nil {
 		log.Println(err)
 	}
+	return t.addSplitRoutes(antifilter, defRoutes, routePath)
+}
+
+func (t *Tun) addSplitRoutes(antifilter, defRoutes []string, routePath string) error {
 	log.Printf("tun: adding %d antifilter + %d default routes...", len(antifilter), len(defRoutes))
-	var addedAntifilter int
+	addedAntifilter := make([]string, 0, len(antifilter))
 	for _, route := range antifilter {
-		err := exec.Command("ip", "route", "add", route, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+		_, err := t.run("ip", "route", "add", route, "via", serverLocalIP, "dev", t.name())
 		if err == nil {
-			t.antifilterRoutes = append(t.antifilterRoutes, route)
-			addedAntifilter++
+			addedAntifilter = append(addedAntifilter, route)
 		} else {
 			log.Printf("tun: failed to add antifilter route %s: %v", route, err)
 		}
 	}
-	var addedDefault int
+	addedDefault := make([]string, 0, len(defRoutes))
 	for _, route := range defRoutes {
-		err := exec.Command("ip", "route", "add", route, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+		_, err := t.run("ip", "route", "add", route, "via", serverLocalIP, "dev", t.name())
 		if err == nil {
-			t.defaultRoutes = append(t.defaultRoutes, route)
-			addedDefault++
+			addedDefault = append(addedDefault, route)
 		} else {
 			log.Printf("tun: failed to add default route %s: %v", route, err)
 		}
 	}
-	t.routePath = routePath
+
 	if err := t.setDNS("8.8.8.8"); err != nil {
+		t.restoreDNS()
+		t.rollbackSplitRoutes(addedAntifilter, addedDefault)
 		return err
 	}
+
+	t.antifilterRoutes = addedAntifilter
+	t.defaultRoutes = addedDefault
+	t.routePath = routePath
 	log.Printf("tun: split routes added antifilter=%d/%d default=%d/%d",
-		addedAntifilter, len(antifilter), addedDefault, len(defRoutes))
+		len(addedAntifilter), len(antifilter), len(addedDefault), len(defRoutes))
 	return nil
 }
 
 func (t *Tun) RemoveSplitedRoutes() {
 	total := len(t.antifilterRoutes) + len(t.defaultRoutes)
-	if total == 0 {
+	if total == 0 && !t.dnsConfigured {
 		return
 	}
 	log.Printf("tun: removing %d split routes...", total)
 	for _, route := range t.antifilterRoutes {
-		if err := exec.Command("ip", "route", "del", route, "via", serverLocalIP, "dev", t.Iface.Name()).Run(); err != nil {
-			log.Printf("tun: failed to remove antifilter route %s: %v", route, err)
-		}
+		t.deleteRoute(route, "via", serverLocalIP, "dev", t.name())
 	}
 	for _, route := range t.defaultRoutes {
-		if err := exec.Command("ip", "route", "del", route, "via", serverLocalIP, "dev", t.Iface.Name()).Run(); err != nil {
-			log.Printf("tun: failed to remove default route %s: %v", route, err)
-		}
+		t.deleteRoute(route, "via", serverLocalIP, "dev", t.name())
 	}
 	t.antifilterRoutes = nil
 	t.defaultRoutes = nil
@@ -108,7 +111,7 @@ func (t *Tun) ReloadSplitedRoutes() error {
 	}
 	for _, r := range t.defaultRoutes {
 		if _, ok := newSet[r]; !ok {
-			err := exec.Command("ip", "route", "del", r, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+			_, err := t.run("ip", "route", "del", r, "via", serverLocalIP, "dev", t.name())
 			if err != nil {
 				log.Printf("tun: failed to remove old route %s: %v", r, err)
 			}
@@ -117,7 +120,7 @@ func (t *Tun) ReloadSplitedRoutes() error {
 	var result []string
 	for _, r := range newRoutes {
 		if _, ok := oldSet[r]; !ok {
-			err := exec.Command("ip", "route", "add", r, "via", serverLocalIP, "dev", t.Iface.Name()).Run()
+			_, err := t.run("ip", "route", "add", r, "via", serverLocalIP, "dev", t.name())
 			if err == nil {
 				result = append(result, r)
 			} else {
@@ -131,4 +134,13 @@ func (t *Tun) ReloadSplitedRoutes() error {
 	t.defaultRoutes = result
 	log.Printf("tun: default routes reloaded total=%d", len(result))
 	return nil
+}
+
+func (t *Tun) rollbackSplitRoutes(antifilter, defaults []string) {
+	for i := len(defaults) - 1; i >= 0; i-- {
+		t.deleteRoute(defaults[i], "via", serverLocalIP, "dev", t.name())
+	}
+	for i := len(antifilter) - 1; i >= 0; i-- {
+		t.deleteRoute(antifilter[i], "via", serverLocalIP, "dev", t.name())
+	}
 }

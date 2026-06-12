@@ -13,13 +13,18 @@ import (
 
 type Tun struct {
 	Iface            *water.Interface
+	ifaceName        string
+	runCommand       commandRunner
 	gateway          string
 	gwIface          string
 	serverIP         string
 	antifilterRoutes []string
 	defaultRoutes    []string
 	routePath        string
+	dnsConfigured    bool
 }
+
+type commandRunner func(name string, args ...string) ([]byte, error)
 
 const MTU = 1400
 const metric = "500"
@@ -34,7 +39,8 @@ func NewTun(cfg *config.Config) (*Tun, error) {
 	}
 	log.Printf("tun: created interface name=%s", cfg.InterfaceName)
 	t := &Tun{
-		Iface: iface,
+		Iface:     iface,
+		ifaceName: iface.Name(),
 	}
 	if err := t.applySettings(cfg); err != nil {
 		iface.Close()
@@ -65,21 +71,21 @@ func (t *Tun) applySettings(cfg *config.Config) error {
 }
 
 func (t *Tun) Close() error {
-	err := exec.Command("ip", "link", "delete", t.Iface.Name()).Run()
+	err := exec.Command("ip", "link", "delete", t.name()).Run()
 	if err != nil {
-		log.Printf("tun: failed to delete interface %s: %v", t.Iface.Name(), err)
+		log.Printf("tun: failed to delete interface %s: %v", t.name(), err)
 	}
 	return t.Iface.Close()
 }
 
 func (t *Tun) setDNS(dns string) error {
-	log.Printf("tun: setting DNS to %s for interface %s", dns, t.Iface.Name())
-	err := exec.Command("resolvectl", "dns", t.Iface.Name(), dns).Run()
-	if err != nil {
+	log.Printf("tun: setting DNS to %s for interface %s", dns, t.name())
+	if _, err := t.run("resolvectl", "dns", t.name(), dns); err != nil {
 		return fmt.Errorf("tun: resolvectl dns: %w", err)
 	}
-	err = exec.Command("resolvectl", "domain", t.Iface.Name(), "~.").Run()
-	if err != nil {
+	t.dnsConfigured = true
+	if _, err := t.run("resolvectl", "domain", t.name(), "~."); err != nil {
+		t.restoreDNS()
 		return fmt.Errorf("tun: resolvectl domain: %w", err)
 	}
 	log.Printf("tun: DNS set to %s", dns)
@@ -87,10 +93,34 @@ func (t *Tun) setDNS(dns string) error {
 }
 
 func (t *Tun) restoreDNS() {
-	err := exec.Command("resolvectl", "revert", t.Iface.Name()).Run()
+	if !t.dnsConfigured {
+		return
+	}
+	if err := t.revertDNS(); err == nil {
+		t.dnsConfigured = false
+	}
+}
+
+func (t *Tun) revertDNS() error {
+	_, err := t.run("resolvectl", "revert", t.name())
 	if err != nil {
 		log.Printf("tun: failed to restore DNS: %v", err)
 	} else {
 		log.Printf("tun: DNS restored")
 	}
+	return err
+}
+
+func (t *Tun) run(name string, args ...string) ([]byte, error) {
+	if t.runCommand != nil {
+		return t.runCommand(name, args...)
+	}
+	return exec.Command(name, args...).CombinedOutput()
+}
+
+func (t *Tun) name() string {
+	if t.ifaceName != "" {
+		return t.ifaceName
+	}
+	return t.Iface.Name()
 }
