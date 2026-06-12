@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -38,8 +39,8 @@ const ServerInterface = "void0"
 func InitConfig(role string, secret string, dir string, port int) (*Config, crypto.PrivKey, error) {
 	path := GetConfigFilePath(dir, role)
 	keyPath := GetKeyPath(dir, role)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, nil, fmt.Errorf("config: failed to create config dir: %w", err)
+	if err := secureConfigDir(dir, true); err != nil {
+		return nil, nil, err
 	}
 	var cfg *Config
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -91,6 +92,9 @@ func InitConfig(role string, secret string, dir string, port int) (*Config, cryp
 }
 
 func LoadConfig(path string) (*Config, error) {
+	if err := secureConfigDir(filepath.Dir(path), false); err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -110,7 +114,7 @@ func GetPeerID(priv crypto.PrivKey) (string, error) {
 	return id.String(), nil
 }
 func LoadIdentity(keypath string) (crypto.PrivKey, error) {
-	data, err := os.ReadFile(keypath)
+	data, err := readPrivateKeyFile(keypath)
 	if err != nil {
 		return nil, fmt.Errorf("config: failed to read key: %w", err)
 	}
@@ -121,6 +125,9 @@ func LoadIdentity(keypath string) (crypto.PrivKey, error) {
 	return key, nil
 }
 func SaveConfig(configPath string, cfg Config) error {
+	if err := secureConfigDir(filepath.Dir(configPath), true); err != nil {
+		return err
+	}
 	yamlData, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("config: failed to marshal config: %w", err)
