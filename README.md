@@ -104,6 +104,8 @@ If the port is omitted, the process listens on a random available port.
 
 This creates a config directory in `$HOME/.voidlink` by default, together with keys and the rendezvous secret.
 It also generates a default split-route list in `default.lst` inside the same config directory, which is used by `route-split` mode.
+The config directory is restricted to the owner (`0700`), and private identity keys use `0600` permissions.
+Existing installations are migrated to these permissions when the config and key are loaded.
 
 If you want to use a different config directory, add `--config <path>` to every command:
 
@@ -187,6 +189,7 @@ sudo ./vlink route remove 1.2.3.0/24
 ```
 
 Changes are reloaded by sending SIGHUP to the running process, which the CLI attempts to do automatically when commands change config.
+Removing a peer from the whitelist also closes its existing libp2p connection and prevents it from opening new tunnel streams.
 
 ## Status and diagnostics
 
@@ -240,11 +243,13 @@ dig example.com
 The `-- link: void1` in the output confirms DNS is routed through the tunnel interface.
 
 DNS is automatically restored when the tunnel is stopped with `sudo ./vlink down`.
+If route or DNS setup fails partway through startup, VoidLink rolls back the changes that were already applied.
 
 ## Notes and limitations
 
 - VoidLink currently supports Linux only.
 - The TUN interface names are fixed to `void0` (server) and `void1` (client).
+- A node currently supports one active tunnel stream at a time. Additional tunnel streams are rejected until the active tunnel closes.
 - `route-split` adds routes directly to the Linux routing table and depends on external split-list sources.
 - The tool is designed for small peer-to-peer setups.
 - **DHT discovery may be unreliable in some regions.** Public IPFS bootstrap nodes 
